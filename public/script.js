@@ -1,4 +1,6 @@
 document.addEventListener('DOMContentLoaded', function() {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
     const micBtn = document.getElementById('micBtn');
     const clearBtn = document.getElementById('clearBtn');
     const liveTranscriptContent = document.getElementById('liveTranscriptContent');
@@ -28,12 +30,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const summarizeBtn = document.getElementById('summarizeBtn');
     const correctBtn = document.getElementById('correctBtn');
     const exportBtn = document.getElementById('exportBtn');
-    const realtimeAnalysisBtn = document.getElementById('realtimeAnalysisBtn');
     const pdfUpload = document.getElementById('pdfUpload');
+    const pdfUploadZone = document.getElementById('pdfUploadZone');
     const pdfStatus = document.getElementById('pdfStatus');
-    const pdfViewerSection = document.getElementById('pdfViewerSection');
-    const pdfContent = document.getElementById('pdfContent');
+    const pdfAnalysisSection = document.getElementById('pdfAnalysisSection');
     const closePdfBtn = document.getElementById('closePdfBtn');
+
+    const pdfCanvas = document.getElementById('pdfCanvas');
+    const pdfCanvasWrapper = document.getElementById('pdfCanvasWrapper');
+    const pdfTextBody = document.getElementById('pdfTextBody');
+    const scanLine = document.getElementById('scanLine');
+    const understandingContentLive = document.getElementById('understandingContentLive');
+    const prevPageBtn = document.getElementById('prevPage');
+    const nextPageBtn = document.getElementById('nextPage');
+    const pageInfo = document.getElementById('pageInfo');
 
     const functionsPanel = document.querySelector('.functions-panel');
     const functionsPanelTitle = functionsPanel ? functionsPanel.querySelector('h3') : null;
@@ -47,6 +57,12 @@ document.addEventListener('DOMContentLoaded', function() {
     let captionBlocks = [];
     let pdfText = '';
     let isAnalyzingPdf = false;
+
+    let pdfDoc = null;
+    let currentPage = 1;
+    let totalPages = 0;
+    let pdfScale = 1.5;
+    let currentMatches = [];
 
     const translationCache = {};
 
@@ -63,6 +79,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 micBtn.classList.add('recording');
                 micBtn.querySelector('.mic-text').textContent = 'Parar';
                 audioVisualizer.classList.add('active');
+                
+                if (pdfDoc) {
+                    startScanAnimation();
+                }
             };
 
             recognition.onend = function() {
@@ -92,7 +112,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     fullTranscript += finalTranscript + ' ';
                     saveToLocalStorage();
 
-                    // Analisar PDF em tempo real se disponível
                     if (pdfText && pdfText.length > 0) {
                         analyzePdfContext(finalTranscript.trim());
                     }
@@ -114,6 +133,257 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             alert('Seu navegador não suporta reconhecimento de fala. Use Chrome ou Edge.');
         }
+    }
+
+    function startScanAnimation() {
+        if (!scanLine) return;
+        scanLine.classList.add('active');
+    }
+
+    function stopScanAnimation() {
+        if (!scanLine) return;
+        scanLine.classList.remove('active');
+    }
+
+    async function renderPdfPage(pageNum) {
+        if (!pdfDoc) return;
+
+        try {
+            const page = await pdfDoc.getPage(pageNum);
+            const viewport = page.getViewport({ scale: pdfScale });
+            
+            const context = pdfCanvas.getContext('2d');
+            pdfCanvas.height = viewport.height;
+            pdfCanvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+
+            await page.render(renderContext).promise;
+            
+            if (pageInfo) {
+                pageInfo.textContent = `${currentPage} / ${totalPages}`;
+            }
+
+            updateHighlightMarkers();
+        } catch (error) {
+            console.error('Error rendering PDF page:', error);
+        }
+    }
+
+    function displayPdfTextContent() {
+        if (!pdfTextBody || !pdfText) return;
+        
+        pdfTextBody.innerHTML = '';
+        
+        const textNode = document.createElement('div');
+        textNode.className = 'pdf-raw-text';
+        textNode.setAttribute('data-original', pdfText);
+        textNode.textContent = pdfText;
+        pdfTextBody.appendChild(textNode);
+    }
+
+    function highlightTextInDocument(matches) {
+        if (!pdfTextBody || !pdfText) return;
+        
+        if (matches.length === 0) {
+            displayPdfTextContent();
+            return;
+        }
+        
+        const escapedText = escapeHtml(pdfText);
+        
+        const positions = [];
+        matches.forEach((match, originalIndex) => {
+            const searchText = match.text.trim();
+            if (searchText.length < 5) return;
+            
+            const lowerPdf = pdfText.toLowerCase();
+            const lowerSearch = searchText.toLowerCase();
+            
+            let searchStart = 0;
+            const snippetLength = Math.min(100, searchText.length);
+            const snippet = searchText.substring(0, snippetLength);
+            
+            let pos = lowerPdf.indexOf(snippet.toLowerCase(), searchStart);
+            
+            if (pos !== -1) {
+                positions.push({
+                    start: pos,
+                    end: pos + snippetLength,
+                    relevance: match.relevance || 'low',
+                    originalIndex: originalIndex
+                });
+            }
+        });
+        
+        positions.sort((a, b) => b.start - a.start);
+        
+        let result = escapedText;
+        const escapedPositions = [];
+        
+        positions.forEach(pos => {
+            const beforeText = pdfText.substring(0, pos.start);
+            const escapedBefore = escapeHtml(beforeText);
+            const adjustedStart = escapedBefore.length;
+            
+            const matchedRaw = pdfText.substring(pos.start, pos.end);
+            const escapedMatched = escapeHtml(matchedRaw);
+            const adjustedEnd = adjustedStart + escapedMatched.length;
+            
+            escapedPositions.push({
+                start: adjustedStart,
+                end: adjustedEnd,
+                relevance: pos.relevance,
+                originalIndex: pos.originalIndex
+            });
+        });
+        
+        escapedPositions.forEach(pos => {
+            const before = result.substring(0, pos.start);
+            const matchedText = result.substring(pos.start, pos.end);
+            const after = result.substring(pos.end);
+            
+            const wrapped = `<span class="pdf-highlight ${pos.relevance}" data-match-index="${pos.originalIndex}">${matchedText}</span>`;
+            result = before + wrapped + after;
+        });
+        
+        pdfTextBody.innerHTML = `<div class="pdf-raw-text">${result}</div>`;
+        
+        setupHighlightInteractions();
+        
+        const firstHighlight = pdfTextBody.querySelector('.pdf-highlight[data-match-index="0"]');
+        if (firstHighlight) {
+            setTimeout(() => {
+                firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 300);
+        }
+    }
+
+    function escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function setupHighlightInteractions() {
+        document.querySelectorAll('.pdf-highlight').forEach(highlight => {
+            highlight.addEventListener('click', function() {
+                const index = parseInt(this.dataset.matchIndex);
+                if (currentMatches[index]) {
+                    showMatchDetail(currentMatches[index], index);
+                }
+                
+                document.querySelectorAll('.pdf-highlight').forEach(h => h.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+    }
+
+    function updateHighlightMarkers() {
+        highlightTextInDocument(currentMatches);
+    }
+
+    function showMatchDetail(match, index) {
+        showUnderstandingResult(match.understanding || 'Trecho selecionado', [match]);
+    }
+
+    function showAnalyzingState() {
+        if (!understandingContentLive) return;
+
+        understandingContentLive.innerHTML = `
+            <div class="analyzing-state">
+                <div class="analyzing-header">
+                    <div class="thinking-orb">
+                        <div class="core"></div>
+                        <div class="ring"></div>
+                    </div>
+                    <div class="analyzing-text">
+                        <p>Analisando sua fala...</p>
+                        <span>Comparando com o documento</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function showUnderstandingResult(understanding, matches) {
+        if (!understandingContentLive) return;
+
+        currentMatches = matches;
+        updateHighlightMarkers();
+
+        let matchesHtml = '';
+        if (matches && matches.length > 0) {
+            matchesHtml = `
+                <div class="matches-section">
+                    <div class="matches-title">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        Trechos Relacionados no PDF
+                    </div>
+                    ${matches.map((match, index) => `
+                        <div class="match-card ${match.relevance || 'low'}" data-index="${index}">
+                            <div class="match-header">
+                                <span class="match-number">${index + 1}</span>
+                                <span class="relevance-tag ${match.relevance || 'low'}">${match.relevance || 'baixa'}</span>
+                            </div>
+                            <div class="match-text">${escapeHtml(match.text.substring(0, 150))}${match.text.length > 150 ? '...' : ''}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        understandingContentLive.innerHTML = `
+            <div class="analyzing-state">
+                <div class="understanding-result">
+                    <div class="result-label">O que a IA entendeu</div>
+                    <div class="understanding-bubble">
+                        <p>${escapeHtml(understanding)}</p>
+                    </div>
+                </div>
+                ${matchesHtml}
+            </div>
+        `;
+
+        document.querySelectorAll('.match-card').forEach(card => {
+            card.addEventListener('click', function() {
+                const index = parseInt(this.dataset.index);
+                const highlight = pdfTextBody.querySelector(`.pdf-highlight[data-match-index="${index}"]`);
+                if (highlight) {
+                    highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    document.querySelectorAll('.pdf-highlight').forEach(h => h.classList.remove('active'));
+                    highlight.classList.add('active');
+                    
+                    highlight.style.animation = 'none';
+                    highlight.offsetHeight;
+                    highlight.style.animation = 'highlightPulse 0.5s ease-in-out 3';
+                }
+            });
+        });
+    }
+
+    function showWaitingState() {
+        if (!understandingContentLive) return;
+
+        understandingContentLive.innerHTML = `
+            <div class="waiting-state">
+                <div class="listening-animation">
+                    <div class="wave-container">
+                        <span class="wave"></span>
+                        <span class="wave"></span>
+                        <span class="wave"></span>
+                        <span class="wave"></span>
+                        <span class="wave"></span>
+                    </div>
+                </div>
+                <p>Aguardando fala para analisar...</p>
+            </div>
+        `;
     }
 
     function clearPlaceholder() {
@@ -346,68 +616,46 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function showWordModal(event, word) {
-        if (!isTranslationActive) return;
-        if (!wordModal || !wordOriginal || !wordTranslation || !wordDefinition) return;
+    async function analyzePdfContext(spokenText) {
+        if (!pdfText || isAnalyzingPdf || spokenText.length < 10) return;
 
-        const cleanWord = word.toLowerCase().replace(/[^a-záàâãéèêíìîóòôõúùûç]/gi, '');
-        const targetLang = translateLang ? translateLang.value : 'en';
-
-        const cacheKey = `${cleanWord}_${targetLang}`;
-
-        wordOriginal.textContent = cleanWord;
-        wordTranslation.textContent = 'Traduzindo...';
-        wordDefinition.textContent = '';
-
-        const rect = event.target.getBoundingClientRect();
-        wordModal.style.left = `${Math.min(rect.left, window.innerWidth - 300)}px`;
-        wordModal.style.top = `${rect.bottom + 10}px`;
-        wordModal.classList.add('active');
-
-        setTimeout(() => {
-            document.addEventListener('click', closeWordModal);
-        }, 100);
-
-        if (translationCache[cacheKey]) {
-            wordTranslation.textContent = translationCache[cacheKey].translation;
-            wordDefinition.textContent = `Idioma detectado: ${translationCache[cacheKey].detectedLang}`;
-            return;
-        }
+        isAnalyzingPdf = true;
+        showAnalyzingState();
+        startScanAnimation();
 
         try {
-            const response = await fetch('/api/translate', {
+            const response = await fetch('/api/analyze-pdf-context', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    text: cleanWord,
-                    targetLang: targetLang
+                    spokenText: spokenText,
+                    pdfText: pdfText,
+                    fullTranscript: fullTranscript
                 })
             });
 
             const data = await response.json();
 
-            if (data.error) {
-                wordTranslation.textContent = 'Erro na tradução';
-                wordDefinition.textContent = data.message || 'Tente novamente';
+            if (data.matches && data.matches.length > 0) {
+                showUnderstandingResult(data.understanding, data.matches);
+            } else if (data.understanding) {
+                showUnderstandingResult(data.understanding, []);
             } else {
-                translationCache[cacheKey] = data;
-                wordTranslation.textContent = data.translation;
-                wordDefinition.textContent = `Idioma detectado: ${data.detectedLang}`;
+                showWaitingState();
             }
         } catch (error) {
-            console.error('Translation error:', error);
-            wordTranslation.textContent = 'Erro na tradução';
-            wordDefinition.textContent = 'Verifique sua conexão';
+            console.error('PDF analysis error:', error);
+            showWaitingState();
+        } finally {
+            isAnalyzingPdf = false;
+            stopScanAnimation();
         }
     }
 
-    function closeWordModal(e) {
-        if (wordModal && !wordModal.contains(e.target)) {
-            wordModal.classList.remove('active');
-            document.removeEventListener('click', closeWordModal);
-        }
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML.replace(/\n/g, '<br>');
     }
 
     if (micBtn) {
@@ -422,6 +670,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 micBtn.classList.remove('recording');
                 micBtn.querySelector('.mic-text').textContent = 'Iniciar';
                 audioVisualizer.classList.remove('active');
+                stopScanAnimation();
             } else {
                 recognition.lang = sourceLang.value;
                 recognition.start();
@@ -445,6 +694,9 @@ document.addEventListener('DOMContentLoaded', function() {
             fullTranscript = '';
             captionBlocks = [];
             currentCaptionBlock = null;
+            currentMatches = [];
+            if (highlightMarkers) highlightMarkers.innerHTML = '';
+            showWaitingState();
             saveToLocalStorage();
         });
     }
@@ -598,12 +850,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 <path d="M9 13v2"/>
                </svg>`
             : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/>
                 <circle cx="12" cy="7" r="4"/>
                </svg>`;
 
         messageDiv.innerHTML = `
-            <div class="message-avatar">${avatarSvg}</div>
+            <div class="message-avatar">
+                ${avatarSvg}
+            </div>
             <div class="message-content">
                 <p>${escapeHtml(content)}</p>
             </div>
@@ -649,197 +903,121 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML.replace(/\n/g, '<br>');
+    if (pdfUploadZone) {
+        pdfUploadZone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+
+        pdfUploadZone.addEventListener('dragleave', function() {
+            this.classList.remove('dragover');
+        });
+
+        pdfUploadZone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/pdf') {
+                handlePdfFile(file);
+            }
+        });
     }
 
-    async function analyzePdfContext(spokenText) {
-        if (!pdfText || isAnalyzingPdf || spokenText.length < 10) return;
-        
-        isAnalyzingPdf = true;
-        
-        // Mostrar modal imediatamente com loading
-        showUnderstandingModal('Analisando...', [], true);
-        
+    if (pdfUpload) {
+        pdfUpload.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                handlePdfFile(file);
+            }
+        });
+    }
+
+    async function handlePdfFile(file) {
+        if (file.type !== 'application/pdf') {
+            showPdfStatus('Por favor, selecione um arquivo PDF válido.', 'error');
+            return;
+        }
+
+        showPdfStatus('Processando PDF...', 'loading');
+
         try {
-            const response = await fetch('/api/analyze-pdf-context', {
+            const arrayBuffer = await file.arrayBuffer();
+            pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            totalPages = pdfDoc.numPages;
+            currentPage = 1;
+
+            await renderPdfPage(currentPage);
+
+            const formData = new FormData();
+            formData.append('pdf', file);
+
+            const response = await fetch('/api/upload-pdf', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    spokenText: spokenText,
-                    pdfText: pdfText,
-                    fullTranscript: fullTranscript
-                })
+                body: file
             });
-            
+
             const data = await response.json();
-            
-            if (data.matches && data.matches.length > 0) {
-                highlightPdfText(data.matches);
-                showUnderstandingModal(data.understanding, data.matches, false);
-                
-                // Scroll automático para o primeiro destaque
-                const firstHighlight = pdfContent.querySelector('.pdf-highlight');
-                if (firstHighlight) {
-                    firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            if (data.error) {
+                showPdfStatus(`Erro: ${data.message}`, 'error');
+            } else {
+                showPdfStatus(`PDF carregado! ${totalPages} página(s) - Análise visual ativada`, 'success');
+
+                pdfText = data.text;
+                fullTranscript = data.text;
+                saveToLocalStorage();
+
+                pdfAnalysisSection.style.display = 'block';
+
+                displayPdfTextContent();
+
+                if (settingsModal) {
+                    settingsModal.classList.remove('active');
                 }
-            } else if (data.understanding) {
-                showUnderstandingModal(data.understanding, [], false);
+
+                showWaitingState();
             }
         } catch (error) {
-            console.error('PDF analysis error:', error);
-            showUnderstandingModal('Erro ao analisar PDF', [], false);
-        } finally {
-            isAnalyzingPdf = false;
+            console.error('PDF processing error:', error);
+            showPdfStatus('Erro ao processar PDF. Tente novamente.', 'error');
         }
     }
 
-    function highlightPdfText(matches) {
-        if (!pdfContent) return;
-        
-        // Limpar destaques anteriores
-        pdfContent.querySelectorAll('.pdf-highlight').forEach(el => {
-            const parent = el.parentNode;
-            parent.replaceChild(document.createTextNode(el.textContent), el);
-        });
-        
-        let content = pdfContent.innerHTML;
-        
-        // Adicionar destaques com cores diferentes por relevância
-        matches.forEach((match, index) => {
-            const relevanceClass = match.relevance === 'alta' ? 'high' : 
-                                  match.relevance === 'média' ? 'medium' : 'low';
-            
-            const regex = new RegExp(escapeRegex(match.text), 'gi');
-            content = content.replace(regex, 
-                `<mark class="pdf-highlight ${relevanceClass}" data-match="${index}">${match.text}</mark>`);
-        });
-        
-        pdfContent.innerHTML = content;
-        
-        // Adicionar evento de clique nos destaques
-        pdfContent.querySelectorAll('.pdf-highlight').forEach(highlight => {
-            highlight.addEventListener('click', function() {
-                const matchIndex = parseInt(this.dataset.match);
-                const match = matches[matchIndex];
-                if (match) {
-                    showMatchDetails(match);
-                }
-            });
-        });
+    function showPdfStatus(message, type) {
+        if (!pdfStatus) return;
+        pdfStatus.textContent = message;
+        pdfStatus.className = `pdf-status ${type}`;
+        pdfStatus.style.display = 'block';
     }
 
-    function escapeRegex(string) {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    }
-
-    function showUnderstandingModal(understanding, matches, isLoading = false) {
-        // Criar modal se não existir
-        let modal = document.getElementById('understandingModal');
-        if (!modal) {
-            modal = document.createElement('div');
-            modal.id = 'understandingModal';
-            modal.className = 'understanding-modal';
-            modal.innerHTML = `
-                <div class="understanding-content glass-panel">
-                    <div class="understanding-header">
-                        <h4>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 8V4H8"/>
-                                <rect width="16" height="12" x="4" y="8" rx="2"/>
-                                <path d="M2 14h2"/>
-                                <path d="M20 14h2"/>
-                                <path d="M15 13v2"/>
-                                <path d="M9 13v2"/>
-                            </svg>
-                            IA Entendendo ao Vivo
-                        </h4>
-                        <button class="close-understanding-btn">×</button>
-                    </div>
-                    <div class="understanding-body">
-                        <div class="understanding-text"></div>
-                        <div class="understanding-matches"></div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-            
-            modal.querySelector('.close-understanding-btn').addEventListener('click', () => {
-                modal.classList.remove('active');
-            });
-        }
-        
-        const textDiv = modal.querySelector('.understanding-text');
-        const matchesDiv = modal.querySelector('.understanding-matches');
-        
-        if (isLoading) {
-            textDiv.innerHTML = `
-                <div class="loading-state">
-                    <div class="thinking-spinner"></div>
-                    <p>Analisando documento e comparando com o que você disse...</p>
-                </div>
-            `;
-            matchesDiv.innerHTML = '';
-        } else {
-            textDiv.innerHTML = `
-                <div class="ai-understanding">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 18l6-6-6-6"/>
-                    </svg>
-                    <p>${escapeHtml(understanding)}</p>
-                </div>
-            `;
-            
-            if (matches.length > 0) {
-                matchesDiv.innerHTML = `
-                    <div class="matches-title">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                            <polyline points="14 2 14 8 20 8"/>
-                        </svg>
-                        Trechos relacionados no PDF:
-                    </div>
-                    ${matches.map((match, index) => `
-                        <div class="match-item ${match.relevance || 'low'}">
-                            <span class="match-number">${index + 1}</span>
-                            <div class="match-content">
-                                <div class="match-text">"${escapeHtml(match.text.substring(0, 150))}${match.text.length > 150 ? '...' : ''}"</div>
-                                ${match.relevance ? `<span class="relevance-badge ${match.relevance}">${match.relevance}</span>` : ''}
-                            </div>
-                        </div>
-                    `).join('')}
-                `;
-            } else {
-                matchesDiv.innerHTML = '<p class="no-matches">Nenhum trecho específico encontrado no PDF.</p>';
+    if (prevPageBtn) {
+        prevPageBtn.addEventListener('click', async function() {
+            if (currentPage > 1) {
+                currentPage--;
+                await renderPdfPage(currentPage);
             }
-        }
-        
-        modal.classList.add('active');
-        
-        // Auto-fechar após 8 segundos (se não estiver em loading)
-        if (!isLoading) {
-            setTimeout(() => {
-                modal.classList.remove('active');
-            }, 8000);
-        }
+        });
     }
-    
-    function showMatchDetails(match) {
-        const modal = document.getElementById('understandingModal');
-        if (!modal) return;
-        
-        const textDiv = modal.querySelector('.understanding-text');
-        textDiv.innerHTML = `
-            <div class="match-detail">
-                <h5>Trecho selecionado:</h5>
-                <p>"${escapeHtml(match.text)}"</p>
-                ${match.relevance ? `<span class="relevance-badge ${match.relevance}">Relevância: ${match.relevance}</span>` : ''}
-            </div>
-        `;
-        
-        modal.classList.add('active');
+
+    if (nextPageBtn) {
+        nextPageBtn.addEventListener('click', async function() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                await renderPdfPage(currentPage);
+            }
+        });
+    }
+
+    if (closePdfBtn) {
+        closePdfBtn.addEventListener('click', function() {
+            if (pdfAnalysisSection) {
+                pdfAnalysisSection.style.display = 'none';
+            }
+            pdfDoc = null;
+            pdfText = '';
+            currentMatches = [];
+            if (pdfTextBody) pdfTextBody.innerHTML = '';
+        });
     }
 
     if (analyzeBtn) {
@@ -975,41 +1153,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (realtimeAnalysisBtn) {
-        realtimeAnalysisBtn.addEventListener('click', async function() {
-            if (chatModal) chatModal.classList.add('active');
-
-            const message = 'Analise o conteúdo que está sendo transcrito em tempo real, destacando informações importantes e conceitos chave. Por favor, responda de forma concisa para cada trecho falado.';
-            addMessageToChat('user', message);
-            chatHistory.push({ role: 'user', content: message });
-
-            showTypingIndicator();
-
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: message,
-                        history: chatHistory.slice(-10),
-                        transcript: fullTranscript,
-                        systemPrompt: 'Você é um assistente de análise em tempo real. Você receberá trechos de transcrição e deve identificar e destacar informações importantes ou conceitos chave em cada trecho. Responda de forma sucinta, focando na análise do conteúdo apresentado.',
-                        thinkingMode: true
-                    })
-                });
-                const data = await response.json();
-                removeTypingIndicator();
-                addMessageToChat('ai', data.response || 'Erro ao iniciar análise em tempo real.');
-                chatHistory.push({ role: 'assistant', content: data.response });
-            } catch (error) {
-                console.error('Real-time analysis error:', error);
-                removeTypingIndicator();
-                addMessageToChat('ai', 'Erro ao conectar com a IA para análise em tempo real.');
-            }
-        });
-    }
-
-
     if (exportBtn) {
         exportBtn.addEventListener('click', function() {
             if (!fullTranscript.trim()) {
@@ -1064,68 +1207,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    if (pdfUpload) {
-        pdfUpload.addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            if (file.type !== 'application/pdf') {
-                pdfStatus.textContent = 'Por favor, selecione um arquivo PDF válido.';
-                pdfStatus.className = 'pdf-status error';
-                return;
-            }
-
-            pdfStatus.textContent = 'Processando PDF...';
-            pdfStatus.className = 'pdf-status';
-            pdfStatus.style.display = 'block';
-
-            try {
-                const formData = new FormData();
-                formData.append('pdf', file);
-
-                const response = await fetch('/api/upload-pdf', {
-                    method: 'POST',
-                    body: file
-                });
-
-                const data = await response.json();
-
-                if (data.error) {
-                    pdfStatus.textContent = `Erro: ${data.message}`;
-                    pdfStatus.className = 'pdf-status error';
-                } else {
-                    pdfStatus.textContent = `PDF carregado com sucesso! ${data.pages} páginas encontradas.`;
-                    pdfStatus.className = 'pdf-status success';
-                    
-                    pdfText = data.text;
-                    pdfContent.textContent = data.text;
-                    pdfViewerSection.style.display = 'block';
-                    
-                    fullTranscript = data.text;
-                    saveToLocalStorage();
-
-                    if (settingsModal) {
-                        settingsModal.classList.remove('active');
-                    }
-                }
-            } catch (error) {
-                console.error('PDF upload error:', error);
-                pdfStatus.textContent = 'Erro ao processar PDF. Tente novamente.';
-                pdfStatus.className = 'pdf-status error';
-            }
-        });
-    }
-
-    if (closePdfBtn) {
-        closePdfBtn.addEventListener('click', function() {
-            if (pdfViewerSection) {
-                pdfViewerSection.style.display = 'none';
-            }
-        });
-    }
-
     loadFromLocalStorage();
     loadChatHistory();
 
-    console.log('Transcript AI initialized successfully');
+    console.log('Transcript AI with Visual PDF Analysis initialized successfully');
 });

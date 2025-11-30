@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Transcript AI - Transcrição ao Vivo</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
     <div class="background-effects">
         <div class="glow-orb glow-orb-1"></div>
         <div class="glow-orb glow-orb-2"></div>
+        <div class="glow-orb glow-orb-3"></div>
     </div>
 
     <header class="glass-header">
@@ -38,17 +40,18 @@
     </header>
 
     <main class="main-container">
-        <section class="pdf-viewer-section glass-panel" id="pdfViewerSection" style="display: none;">
+        <section class="pdf-analysis-section glass-panel" id="pdfAnalysisSection" style="display: none;">
             <div class="section-header">
                 <h2>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="16" x2="8" y1="13" y2="13"/>
-                        <line x1="16" x2="8" y1="17" y2="17"/>
-                        <polyline points="10 9 9 9 8 9"/>
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4"/>
                     </svg>
-                    Documento PDF
+                    Análise Visual do PDF
+                    <span class="ai-badge">
+                        <span class="pulse-dot"></span>
+                        IA Ativa
+                    </span>
                 </h2>
                 <button class="control-btn" id="closePdfBtn" title="Fechar PDF">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -57,7 +60,93 @@
                     </svg>
                 </button>
             </div>
-            <div class="pdf-content" id="pdfContent"></div>
+            
+            <div class="pdf-visual-container">
+                <div class="pdf-document-area">
+                    <div class="pdf-canvas-wrapper" id="pdfCanvasWrapper">
+                        <canvas id="pdfCanvas"></canvas>
+                        <div class="pdf-overlay" id="pdfOverlay">
+                            <svg class="scanning-svg" id="scanningSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                <defs>
+                                    <linearGradient id="scanGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                        <stop offset="0%" style="stop-color:#00f0ff;stop-opacity:0"/>
+                                        <stop offset="50%" style="stop-color:#00f0ff;stop-opacity:0.8"/>
+                                        <stop offset="100%" style="stop-color:#00f0ff;stop-opacity:0"/>
+                                    </linearGradient>
+                                    <filter id="glow">
+                                        <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+                                        <feMerge>
+                                            <feMergeNode in="coloredBlur"/>
+                                            <feMergeNode in="SourceGraphic"/>
+                                        </feMerge>
+                                    </filter>
+                                </defs>
+                                <line class="scan-line" id="scanLine" x1="0" y1="0" x2="100" y2="0" stroke="url(#scanGradient)" stroke-width="0.5" filter="url(#glow)"/>
+                            </svg>
+                        </div>
+                        <div class="pdf-page-nav">
+                            <button class="nav-btn" id="prevPage">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="15 18 9 12 15 6"/>
+                                </svg>
+                            </button>
+                            <span class="page-info" id="pageInfo">1 / 1</span>
+                            <button class="nav-btn" id="nextPage">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="9 18 15 12 9 6"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="pdf-text-content" id="pdfTextContent">
+                        <div class="pdf-text-header">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            Texto do Documento
+                        </div>
+                        <div class="pdf-text-body" id="pdfTextBody"></div>
+                    </div>
+                </div>
+                
+                <div class="ai-understanding-panel" id="aiUnderstandingPanel">
+                    <div class="understanding-header-live">
+                        <div class="ai-icon-container">
+                            <div class="ai-brain-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 2a4 4 0 0 1 4 4c0 1.5-.5 2.5-1 3.5l-1 2"/>
+                                    <path d="M8 6a4 4 0 0 0-4 4c0 2 1 3 2 4"/>
+                                    <path d="M12 22a4 4 0 0 0 4-4c0-1.5-.5-2.5-1-3.5"/>
+                                    <path d="M4 14c0 2 2 4 4 4h8"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </div>
+                            <div class="neural-waves">
+                                <span></span><span></span><span></span>
+                            </div>
+                        </div>
+                        <h3>IA Entendendo ao Vivo</h3>
+                    </div>
+                    
+                    <div class="understanding-content-live" id="understandingContentLive">
+                        <div class="waiting-state">
+                            <div class="listening-animation">
+                                <div class="wave-container">
+                                    <span class="wave"></span>
+                                    <span class="wave"></span>
+                                    <span class="wave"></span>
+                                    <span class="wave"></span>
+                                    <span class="wave"></span>
+                                </div>
+                            </div>
+                            <p>Aguardando fala para analisar...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="connection-lines" id="connectionLines"></div>
+                </div>
+            </div>
         </section>
 
         <section class="transcript-section">
@@ -271,8 +360,20 @@
 
             <div class="settings-body">
                 <div class="setting-group">
-                    <label>Upload de PDF para Análise</label>
-                    <input type="file" id="pdfUpload" accept=".pdf" class="pdf-upload-input">
+                    <label>Upload de PDF para Análise Visual</label>
+                    <div class="pdf-upload-zone" id="pdfUploadZone">
+                        <input type="file" id="pdfUpload" accept=".pdf" class="pdf-upload-input">
+                        <div class="upload-content">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                                <line x1="12" x2="12" y1="18" y2="12"/>
+                                <line x1="9" x2="15" y1="15" y2="15"/>
+                            </svg>
+                            <p>Arraste um PDF ou clique para selecionar</p>
+                            <span>A IA irá analisar visualmente enquanto você fala</span>
+                        </div>
+                    </div>
                     <div id="pdfStatus" class="pdf-status"></div>
                 </div>
 

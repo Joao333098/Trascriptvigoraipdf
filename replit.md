@@ -36,6 +36,15 @@ Site de transcrição de áudio ao vivo com chat AI integrado. Design premium "L
 - Corrigir: verifica erros gramaticais
 - Exportar: baixa como arquivo .txt
 
+### Análise Visual de PDF
+- Upload de PDF com drag-and-drop ou seleção de arquivo
+- Renderização do PDF usando PDF.js no canvas
+- Painel de texto do documento com destaques em tempo real
+- Sistema de destaque baseado no texto real (não posições arbitrárias)
+- Cores de destaque por relevância: verde (alta), amarelo (média), ciano (baixa)
+- Clique nos cards de correspondência rola para o texto destacado
+- Animação de escaneamento visual durante análise
+
 ### Configurações
 - Idiomas de transcrição (múltipla seleção)
 - Idioma de tradução
