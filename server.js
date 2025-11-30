@@ -486,33 +486,53 @@ async function handleAnalyzePdfContext(req, res) {
                 throw new Error('Cliente Zhipu AI não está inicializado');
             }
 
+            // Buscar palavras-chave primeiro
+            const keywords = spokenText.toLowerCase().split(/\s+/).filter(w => w.length > 3);
+            const pdfLower = pdfText.toLowerCase();
+            
+            // Encontrar correspondências diretas no PDF
+            const directMatches = [];
+            keywords.forEach(keyword => {
+                let index = pdfLower.indexOf(keyword);
+                while (index !== -1 && directMatches.length < 5) {
+                    const start = Math.max(0, index - 100);
+                    const end = Math.min(pdfText.length, index + keyword.length + 100);
+                    const snippet = pdfText.substring(start, end).trim();
+                    
+                    if (snippet.length > 20) {
+                        directMatches.push({
+                            text: snippet,
+                            relevance: 'high',
+                            keyword: keyword
+                        });
+                    }
+                    index = pdfLower.indexOf(keyword, index + 1);
+                }
+            });
+
             const systemPrompt = `Você é um assistente especializado em análise de documentos PDF em tempo real.
 
-Sua tarefa:
-1. Entenda o que a pessoa está falando
-2. Encontre os trechos EXATOS do PDF que se relacionam com o que foi dito
-3. Classifique cada trecho por relevância (alta/média/baixa)
+Analise o que a pessoa falou e encontre os trechos correspondentes no PDF.
 
-Retorne APENAS um JSON válido com esta estrutura:
+Retorne APENAS um JSON válido:
 {
-  "understanding": "Explicação clara e concisa do que você entendeu que a pessoa está falando sobre",
+  "understanding": "Uma frase curta explicando o que você entendeu",
   "matches": [
     {
-      "text": "Trecho EXATO e COMPLETO do PDF (não resuma, copie literalmente)",
-      "relevance": "alta" (use "alta" para correspondências diretas, "média" para relacionadas, "baixa" para contextuais)
+      "text": "Trecho literal do PDF (copie exatamente, mínimo 50 caracteres)",
+      "relevance": "high"
     }
   ]
 }
 
-Importante:
-- Copie os trechos EXATAMENTE como aparecem no PDF
-- Inclua contexto suficiente (frases completas, não fragmentos)
-- Priorize trechos que mencionam diretamente o que foi falado
-- Máximo 5 trechos mais relevantes
-- Se não houver correspondência clara, retorne matches vazio []`;
+REGRAS IMPORTANTES:
+- Copie trechos LITERAIS do PDF (não resuma)
+- Cada trecho deve ter pelo menos 50 caracteres
+- Máximo 3-5 trechos
+- Use "high" para relevância alta, "medium" para média, "low" para baixa`;
 
             const response = await zhipuClient.createCompletions({
-                model: 'glm-4.1v-thinking-flash',
+                model: 'glm-4-flash',
                 messages: [
                     {
                         role: "system",
@@ -520,15 +540,21 @@ Importante:
                     },
                     {
                         role: "user",
-                        content: `Texto do PDF:\n${pdfText.substring(0, 3000)}\n\nTexto falado agora: "${spokenText}"\n\nContexto da conversa: ${fullTranscript.substring(0, 500)}`
+                        content: `PDF:\n${pdfText.substring(0, 4000)}\n\nFala: "${spokenText}"`
                     }
                 ],
-                temperature: 0.5,
-                max_tokens: 1000
+                temperature: 0.3,
+                max_tokens: 1500
             });
 
             if (!response || !response.choices || response.choices.length === 0) {
-                throw new Error('Resposta de análise vazia');
+                // Retornar matches diretos se a IA falhar
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    understanding: spokenText,
+                    matches: directMatches.slice(0, 3)
+                }));
+                return;
             }
 
             let analysisText = response.choices[0].message.content.trim();
@@ -537,14 +563,25 @@ Importante:
             const jsonMatch = analysisText.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
                 const analysisData = JSON.parse(jsonMatch[0]);
+                
+                // Garantir que cada match tenha comprimento mínimo
+                if (analysisData.matches) {
+                    analysisData.matches = analysisData.matches.filter(m => m.text && m.text.length >= 30);
+                }
+                
+                // Se não houver matches da IA, usar os diretos
+                if (!analysisData.matches || analysisData.matches.length === 0) {
+                    analysisData.matches = directMatches.slice(0, 3);
+                }
+                
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify(analysisData));
             } else {
-                // Fallback
+                // Fallback com matches diretos
                 res.writeHead(200, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({
-                    understanding: analysisText.substring(0, 200),
-                    matches: []
+                    understanding: spokenText,
+                    matches: directMatches.slice(0, 3)
                 }));
             }
 

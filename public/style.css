@@ -325,34 +325,58 @@ body {
     border-radius: 3px;
 }
 
-.pdf-highlight {
-    padding: 2px 4px;
+.pdf-highlight, mark.pdf-highlight {
+    padding: 3px 6px;
+    margin: 0 2px;
     border-radius: 4px;
     cursor: pointer;
     transition: all 0.3s ease;
-    animation: highlightPulse 2s ease-in-out infinite;
     display: inline;
+    font-weight: 600;
+    text-decoration: none;
 }
 
-.pdf-highlight.high {
-    background: linear-gradient(120deg, rgba(0, 255, 100, 0.4) 0%, rgba(0, 255, 100, 0.2) 100%);
-    border-bottom: 2px solid var(--success);
-    box-shadow: 0 0 10px rgba(0, 255, 100, 0.3);
-    color: var(--text-primary);
+.pdf-highlight.high, mark.pdf-highlight.high {
+    background: rgba(255, 235, 59, 0.7) !important;
+    color: #000000 !important;
+    border: 2px solid #FDD835;
+    box-shadow: 0 0 15px rgba(255, 235, 59, 0.6), inset 0 0 10px rgba(255, 235, 59, 0.3);
+    animation: highlightPulseYellow 2s ease-in-out infinite;
 }
 
-.pdf-highlight.medium {
-    background: linear-gradient(120deg, rgba(255, 200, 0, 0.4) 0%, rgba(255, 200, 0, 0.2) 100%);
-    border-bottom: 2px solid var(--warning);
-    box-shadow: 0 0 10px rgba(255, 200, 0, 0.3);
-    color: var(--text-primary);
+.pdf-highlight.medium, mark.pdf-highlight.medium {
+    background: rgba(255, 152, 0, 0.6) !important;
+    color: #000000 !important;
+    border: 2px solid #FF9800;
+    box-shadow: 0 0 12px rgba(255, 152, 0, 0.5);
+    animation: highlightPulseOrange 2.5s ease-in-out infinite;
 }
 
-.pdf-highlight.low {
-    background: linear-gradient(120deg, rgba(0, 240, 255, 0.3) 0%, rgba(0, 240, 255, 0.15) 100%);
-    border-bottom: 2px solid var(--neon-glow);
-    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
-    color: var(--text-primary);
+.pdf-highlight.low, mark.pdf-highlight.low {
+    background: rgba(0, 240, 255, 0.5) !important;
+    color: #000000 !important;
+    border: 2px solid var(--neon-glow);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+}
+
+@keyframes highlightPulseYellow {
+    0%, 100% { 
+        box-shadow: 0 0 15px rgba(255, 235, 59, 0.6), inset 0 0 10px rgba(255, 235, 59, 0.3);
+        transform: scale(1);
+    }
+    50% { 
+        box-shadow: 0 0 25px rgba(255, 235, 59, 0.9), inset 0 0 15px rgba(255, 235, 59, 0.5);
+        transform: scale(1.02);
+    }
+}
+
+@keyframes highlightPulseOrange {
+    0%, 100% { 
+        box-shadow: 0 0 12px rgba(255, 152, 0, 0.5);
+    }
+    50% { 
+        box-shadow: 0 0 20px rgba(255, 152, 0, 0.8);
+    }
 }
 
 .pdf-highlight:hover {

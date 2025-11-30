@@ -193,60 +193,61 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        const escapedText = escapeHtml(pdfText);
+        let result = escapeHtml(pdfText);
         
-        const positions = [];
-        matches.forEach((match, originalIndex) => {
+        // Processar cada match
+        const allHighlights = [];
+        matches.forEach((match, index) => {
             const searchText = match.text.trim();
-            if (searchText.length < 5) return;
+            if (searchText.length < 20) return;
             
-            const lowerPdf = pdfText.toLowerCase();
-            const lowerSearch = searchText.toLowerCase();
+            // Procurar o texto exato no PDF
+            const textToFind = searchText.substring(0, Math.min(200, searchText.length));
+            const pdfLower = pdfText.toLowerCase();
+            const searchLower = textToFind.toLowerCase();
             
-            let searchStart = 0;
-            const snippetLength = Math.min(100, searchText.length);
-            const snippet = searchText.substring(0, snippetLength);
+            let startPos = pdfLower.indexOf(searchLower);
             
-            let pos = lowerPdf.indexOf(snippet.toLowerCase(), searchStart);
-            
-            if (pos !== -1) {
-                positions.push({
-                    start: pos,
-                    end: pos + snippetLength,
-                    relevance: match.relevance || 'low',
-                    originalIndex: originalIndex
+            if (startPos !== -1) {
+                const endPos = startPos + textToFind.length;
+                const relevance = match.relevance || 'high';
+                
+                allHighlights.push({
+                    start: startPos,
+                    end: endPos,
+                    relevance: relevance,
+                    index: index
+                });
+            } else {
+                // Buscar por palavras-chave individuais
+                const keywords = searchText.split(/\s+/).filter(w => w.length > 4);
+                keywords.slice(0, 3).forEach(keyword => {
+                    let pos = pdfLower.indexOf(keyword.toLowerCase());
+                    if (pos !== -1) {
+                        const contextStart = Math.max(0, pos - 50);
+                        const contextEnd = Math.min(pdfText.length, pos + keyword.length + 50);
+                        
+                        allHighlights.push({
+                            start: contextStart,
+                            end: contextEnd,
+                            relevance: 'medium',
+                            index: index
+                        });
+                    }
                 });
             }
         });
         
-        positions.sort((a, b) => b.start - a.start);
+        // Ordenar por posição (do final para o início para não quebrar índices)
+        allHighlights.sort((a, b) => b.start - a.start);
         
-        let result = escapedText;
-        const escapedPositions = [];
-        
-        positions.forEach(pos => {
-            const beforeText = pdfText.substring(0, pos.start);
-            const escapedBefore = escapeHtml(beforeText);
-            const adjustedStart = escapedBefore.length;
+        // Aplicar highlights
+        allHighlights.forEach(highlight => {
+            const before = result.substring(0, highlight.start);
+            const text = result.substring(highlight.start, highlight.end);
+            const after = result.substring(highlight.end);
             
-            const matchedRaw = pdfText.substring(pos.start, pos.end);
-            const escapedMatched = escapeHtml(matchedRaw);
-            const adjustedEnd = adjustedStart + escapedMatched.length;
-            
-            escapedPositions.push({
-                start: adjustedStart,
-                end: adjustedEnd,
-                relevance: pos.relevance,
-                originalIndex: pos.originalIndex
-            });
-        });
-        
-        escapedPositions.forEach(pos => {
-            const before = result.substring(0, pos.start);
-            const matchedText = result.substring(pos.start, pos.end);
-            const after = result.substring(pos.end);
-            
-            const wrapped = `<span class="pdf-highlight ${pos.relevance}" data-match-index="${pos.originalIndex}">${matchedText}</span>`;
+            const wrapped = `<mark class="pdf-highlight ${highlight.relevance}" data-match-index="${highlight.index}">${text}</mark>`;
             result = before + wrapped + after;
         });
         
@@ -254,7 +255,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         setupHighlightInteractions();
         
-        const firstHighlight = pdfTextBody.querySelector('.pdf-highlight[data-match-index="0"]');
+        // Rolar para o primeiro destaque
+        const firstHighlight = pdfTextBody.querySelector('.pdf-highlight');
         if (firstHighlight) {
             setTimeout(() => {
                 firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
