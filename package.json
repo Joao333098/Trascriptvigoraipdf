@@ -10,7 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@types/node": "^22.13.11",
+    "@types/node": "^22.19.1",
     "form-data": "^4.0.5",
     "google-translate-api-x": "^10.7.2",
     "pdf-parse": "^2.4.5",
