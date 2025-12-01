@@ -57,6 +57,9 @@ document.addEventListener('DOMContentLoaded', function() {
     let captionBlocks = [];
     let pdfText = '';
     let isAnalyzingPdf = false;
+    let userScrolled = false;
+    let summaryInterval = null;
+    let lastSummaryTime = 0;
 
     let pdfDoc = null;
     let currentPage = 1;
@@ -517,9 +520,44 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function scrollToBottom() {
-        if (liveTranscriptContainer) {
+        if (liveTranscriptContainer && !userScrolled) {
             liveTranscriptContainer.scrollTop = liveTranscriptContainer.scrollHeight;
         }
+    }
+
+    // Detectar quando usuário faz scroll manualmente
+    if (liveTranscriptContainer) {
+        liveTranscriptContainer.addEventListener('scroll', function() {
+            const isAtBottom = Math.abs(
+                this.scrollHeight - this.scrollTop - this.clientHeight
+            ) < 50;
+            userScrolled = !isAtBottom;
+        });
+    }
+
+    function showNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `summary-notification ${type}`;
+        notification.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="21" x2="14" y1="4" y2="4"/>
+                <line x1="10" x2="3" y1="4" y2="4"/>
+                <line x1="21" x2="12" y1="12" y2="12"/>
+                <line x1="8" x2="3" y1="12" y2="12"/>
+                <line x1="21" x2="16" y1="20" y2="20"/>
+                <line x1="12" x2="3" y1="20" y2="20"/>
+            </svg>
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => notification.classList.add('show'), 100);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 5000);
     }
 
     async function analyzePdfContext(spokenText) {
@@ -611,12 +649,71 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     if (translateToggle) {
-        translateToggle.addEventListener('click', function() {
+        translateToggle.addEventListener('click', async function() {
             isTranslationActive = !isTranslationActive;
             this.classList.toggle('active', isTranslationActive);
 
             if (translateLang) {
                 translateLang.style.display = isTranslationActive ? 'block' : 'none';
+            }
+
+            // Traduzir blocos existentes quando ativar
+            if (isTranslationActive && captionBlocks.length > 0) {
+                showNotification('Traduzindo conteúdo existente...', 'info');
+                
+                for (const block of captionBlocks) {
+                    if (block.classList.contains('simple') || block.classList.contains('translated')) {
+                        continue;
+                    }
+
+                    const originalDiv = block.querySelector('.caption-original');
+                    if (!originalDiv) continue;
+
+                    const originalText = originalDiv.textContent;
+                    if (!originalText || originalText.trim().length < 3) continue;
+
+                    // Adicionar div de tradução se não existir
+                    let translationDiv = block.querySelector('.caption-translation');
+                    if (!translationDiv) {
+                        translationDiv = document.createElement('div');
+                        translationDiv.className = 'caption-translation';
+                        block.appendChild(translationDiv);
+                    }
+
+                    translationDiv.innerHTML = `
+                        <div class="translation-loading">
+                            <span class="dot"></span>
+                            <span class="dot"></span>
+                            <span class="dot"></span>
+                        </div>
+                    `;
+
+                    try {
+                        const targetLang = translateLang ? translateLang.value : 'en';
+                        const response = await fetch('/api/translate', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                text: originalText,
+                                targetLang: targetLang
+                            })
+                        });
+
+                        const data = await response.json();
+
+                        if (data.error) {
+                            translationDiv.innerHTML = `<span class="translation-error">Erro</span>`;
+                        } else {
+                            translationDiv.innerHTML = `<span class="translated-text">${escapeHtml(data.translation)}</span>`;
+                            block.classList.add('translated');
+                        }
+                    } catch (error) {
+                        translationDiv.innerHTML = `<span class="translation-error">Erro</span>`;
+                    }
+
+                    // Pequeno delay entre traduções
+                    await new Promise(r => setTimeout(r, 300));
+                }
             }
         });
     }
@@ -962,38 +1059,61 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    if (summarizeBtn) {
-        summarizeBtn.addEventListener('click', async function() {
-            if (chatModal) chatModal.classList.add('active');
+    async function generateSummary() {
+        if (!fullTranscript || fullTranscript.trim().length < 50) {
+            return;
+        }
 
+        const now = Date.now();
+        if (now - lastSummaryTime < 30000) {
+            return;
+        }
+        lastSummaryTime = now;
+
+        try {
             const thinkingModeEl = document.getElementById('thinkingMode');
             const thinkingMode = thinkingModeEl ? thinkingModeEl.checked : false;
 
-            const message = 'Faça um resumo completo e detalhado da transcrição';
-            addMessageToChat('user', message);
-            chatHistory.push({ role: 'user', content: message });
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: 'Faça um resumo curto e objetivo em até 2 frases',
+                    history: [],
+                    transcript: fullTranscript,
+                    systemPrompt: 'Você é especialista em criar resumos ultra-concisos.',
+                    thinkingMode: thinkingMode
+                })
+            });
+            const data = await response.json();
+            
+            if (data.response) {
+                showNotification(data.response, 'summary');
+            }
+        } catch (error) {
+            console.error('Auto summary error:', error);
+        }
+    }
 
-            showTypingIndicator();
+    if (summarizeBtn) {
+        let autoSummaryActive = false;
 
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: message,
-                        history: chatHistory.slice(-10),
-                        transcript: fullTranscript,
-                        systemPrompt: 'Você é especialista em criar resumos concisos e informativos.',
-                        thinkingMode: thinkingMode
-                    })
-                });
-                const data = await response.json();
-                removeTypingIndicator();
-                addMessageToChat('ai', data.response || 'Erro ao resumir');
-                chatHistory.push({ role: 'assistant', content: data.response });
-            } catch (error) {
-                removeTypingIndicator();
-                addMessageToChat('ai', 'Erro ao conectar com a IA');
+        summarizeBtn.addEventListener('click', async function() {
+            autoSummaryActive = !autoSummaryActive;
+            
+            if (autoSummaryActive) {
+                this.classList.add('active');
+                showNotification('Resumo automático ativado! Resumindo a cada 30 segundos...', 'info');
+                
+                summaryInterval = setInterval(generateSummary, 30000);
+                generateSummary();
+            } else {
+                this.classList.remove('active');
+                if (summaryInterval) {
+                    clearInterval(summaryInterval);
+                    summaryInterval = null;
+                }
+                showNotification('Resumo automático desativado', 'info');
             }
         });
     }

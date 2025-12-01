@@ -973,7 +973,47 @@ body {
 .transcript-controls {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 20px;
+}
+
+.audio-lang-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+
+.audio-lang-group svg {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.translation-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px;
+    background: rgba(0, 240, 255, 0.05);
+    border: 1px solid rgba(0, 240, 255, 0.15);
+    border-radius: 12px;
+}
+
+.translation-toggle.active {
+    background: linear-gradient(135deg, #00f0ff 0%, #00c4cc 100%);
+    color: #000;
+}
+
+.audio-lang {
+    background: transparent;
+    border: none;
+    font-size: 14px;
+}
+
+.translate-lang {
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.2);
 }
 
 .control-btn {
@@ -1916,7 +1956,7 @@ body {
     .pdf-visual-container {
         grid-template-columns: 1fr;
     }
-    
+
     .ai-understanding-panel {
         border-left: none;
         border-top: 1px solid rgba(0, 240, 255, 0.2);
@@ -2237,11 +2277,11 @@ body {
     .history-content {
         max-height: 90vh;
     }
-    
+
     .history-list {
         padding: 12px;
     }
-    
+
     .history-item-actions {
         flex-direction: column;
     }
