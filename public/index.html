@@ -24,6 +24,12 @@
             <span class="logo-text">Transcript AI</span>
         </div>
         <div class="header-controls">
+            <button class="icon-btn" id="historyBtn" title="Histórico">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <polyline points="12 6 12 12 16 14"/>
+                </svg>
+            </button>
             <button class="icon-btn" id="settingsBtn" title="Configurações">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="3"/>
@@ -424,6 +430,37 @@
             <div class="word-original" id="wordOriginal"></div>
             <div class="word-translation" id="wordTranslation"></div>
             <div class="word-definition" id="wordDefinition"></div>
+        </div>
+    </div>
+
+    <div class="history-modal" id="historyModal">
+        <div class="history-content glass-panel">
+            <div class="history-header">
+                <h3>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    Histórico de Transcrições
+                </h3>
+                <div class="history-header-actions">
+                    <button class="clear-history-btn" id="clearHistoryBtn" title="Limpar Histórico">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                        </svg>
+                    </button>
+                    <button class="close-btn" id="closeHistoryBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" x2="6" y1="6" y2="18"/>
+                            <line x1="6" x2="18" y1="6" y2="18"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            <div class="history-list" id="historyList">
+            </div>
         </div>
     </div>
 

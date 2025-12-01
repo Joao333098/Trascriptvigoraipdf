@@ -65,6 +65,13 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentMatches = [];
 
     const translationCache = {};
+    
+    let transcriptHistory = [];
+    const historyBtn = document.getElementById('historyBtn');
+    const historyModal = document.getElementById('historyModal');
+    const closeHistoryBtn = document.getElementById('closeHistoryBtn');
+    const historyList = document.getElementById('historyList');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
     function initSpeechRecognition() {
         if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
@@ -1184,18 +1191,231 @@ document.addEventListener('DOMContentLoaded', function() {
         localStorage.setItem('transcript', fullTranscript);
     }
 
-    function loadFromLocalStorage() {
-        const savedTranscript = localStorage.getItem('transcript');
-        if (savedTranscript && savedTranscript.trim()) {
-            fullTranscript = savedTranscript;
-            clearPlaceholder();
-            const sentences = savedTranscript.trim().split(/(?<=[.!?])\s+/);
-            sentences.forEach(sentence => {
-                if (sentence.trim()) {
-                    finalizeSimpleCaption(sentence.trim());
-                }
-            });
+    function loadTranscriptHistory() {
+        const saved = localStorage.getItem('transcriptHistory');
+        if (saved) {
+            try {
+                transcriptHistory = JSON.parse(saved);
+            } catch (e) {
+                transcriptHistory = [];
+            }
         }
+    }
+
+    function saveTranscriptHistory() {
+        localStorage.setItem('transcriptHistory', JSON.stringify(transcriptHistory));
+    }
+
+    function addToHistory(transcriptText) {
+        if (!transcriptText || transcriptText.trim().length < 10) return;
+        
+        const historyItem = {
+            id: Date.now(),
+            text: transcriptText.trim(),
+            date: new Date().toISOString(),
+            preview: transcriptText.trim().substring(0, 100) + (transcriptText.length > 100 ? '...' : '')
+        };
+        
+        transcriptHistory.unshift(historyItem);
+        
+        if (transcriptHistory.length > 50) {
+            transcriptHistory = transcriptHistory.slice(0, 50);
+        }
+        
+        saveTranscriptHistory();
+    }
+
+    function formatDate(isoString) {
+        const date = new Date(isoString);
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMins < 1) return 'Agora';
+        if (diffMins < 60) return `${diffMins} min atrás`;
+        if (diffHours < 24) return `${diffHours}h atrás`;
+        if (diffDays < 7) return `${diffDays} dias atrás`;
+        
+        return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    }
+
+    function renderHistoryList() {
+        if (!historyList) return;
+        
+        if (transcriptHistory.length === 0) {
+            historyList.innerHTML = `
+                <div class="history-empty">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="12" cy="12" r="10"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <p>Nenhuma transcrição no histórico</p>
+                    <span>As transcrições anteriores aparecerão aqui</span>
+                </div>
+            `;
+            return;
+        }
+        
+        historyList.innerHTML = transcriptHistory.map(item => `
+            <div class="history-item" data-id="${item.id}">
+                <div class="history-item-header">
+                    <span class="history-date">${formatDate(item.date)}</span>
+                    <button class="history-delete-btn" data-id="${item.id}" title="Excluir">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M3 6h18"/>
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="history-item-preview">${escapeHtml(item.preview)}</div>
+                <div class="history-item-actions">
+                    <button class="history-load-btn" data-id="${item.id}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" x2="12" y1="3" y2="15"/>
+                        </svg>
+                        Carregar
+                    </button>
+                    <button class="history-export-btn" data-id="${item.id}">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" x2="12" y1="15" y2="3"/>
+                        </svg>
+                        Exportar
+                    </button>
+                </div>
+            </div>
+        `).join('');
+        
+        document.querySelectorAll('.history-delete-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const id = parseInt(this.dataset.id);
+                deleteHistoryItem(id);
+            });
+        });
+        
+        document.querySelectorAll('.history-load-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const id = parseInt(this.dataset.id);
+                loadHistoryItem(id);
+            });
+        });
+        
+        document.querySelectorAll('.history-export-btn').forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const id = parseInt(this.dataset.id);
+                exportHistoryItem(id);
+            });
+        });
+    }
+
+    function deleteHistoryItem(id) {
+        if (!id) return;
+        transcriptHistory = transcriptHistory.filter(item => item.id !== id);
+        saveTranscriptHistory();
+        renderHistoryList();
+    }
+
+    function loadHistoryItem(id) {
+        if (!id) return;
+        const item = transcriptHistory.find(item => item.id === id);
+        if (!item || !item.text) return;
+        
+        if (fullTranscript && fullTranscript.trim().length > 10) {
+            addToHistory(fullTranscript);
+        }
+        
+        fullTranscript = item.text;
+        liveTranscriptContent.innerHTML = '';
+        captionBlocks = [];
+        currentCaptionBlock = null;
+        
+        const sentences = item.text.trim().split(/(?<=[.!?])\s+/);
+        sentences.forEach(sentence => {
+            if (sentence.trim()) {
+                finalizeSimpleCaption(sentence.trim());
+            }
+        });
+        
+        saveToLocalStorage();
+        
+        if (historyModal) {
+            historyModal.classList.remove('active');
+        }
+    }
+
+    function exportHistoryItem(id) {
+        if (!id) return;
+        const item = transcriptHistory.find(item => item.id === id);
+        if (!item || !item.text) return;
+        
+        const blob = new Blob([item.text], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date(item.date).toISOString().slice(0, 10);
+        a.download = `transcricao_${dateStr}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+    
+    window.addEventListener('beforeunload', function() {
+        if (fullTranscript && fullTranscript.trim().length > 10) {
+            saveToLocalStorage();
+        }
+    });
+
+    if (historyBtn && historyModal) {
+        historyBtn.addEventListener('click', function() {
+            renderHistoryList();
+            historyModal.classList.add('active');
+        });
+    }
+
+    if (closeHistoryBtn && historyModal) {
+        closeHistoryBtn.addEventListener('click', function() {
+            historyModal.classList.remove('active');
+        });
+    }
+
+    if (historyModal) {
+        historyModal.addEventListener('click', function(e) {
+            if (e.target === historyModal) {
+                historyModal.classList.remove('active');
+            }
+        });
+    }
+
+    if (clearHistoryBtn) {
+        clearHistoryBtn.addEventListener('click', function() {
+            if (confirm('Tem certeza que deseja limpar todo o histórico?')) {
+                transcriptHistory = [];
+                saveTranscriptHistory();
+                renderHistoryList();
+            }
+        });
+    }
+
+    function loadFromLocalStorage() {
+        loadTranscriptHistory();
+        
+        const savedTranscript = localStorage.getItem('transcript');
+        if (savedTranscript && savedTranscript.trim().length > 10) {
+            addToHistory(savedTranscript);
+            localStorage.removeItem('transcript');
+        }
+        
+        fullTranscript = '';
     }
 
     function saveChatHistory() {
