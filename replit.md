@@ -30,6 +30,14 @@ Site de transcrição de áudio ao vivo com chat AI integrado. Design premium "L
 - Indicador de digitação animado
 - Histórico salvo no localStorage
 
+### Histórico de Transcrições
+- Ao recarregar a página, a transcrição atual é automaticamente salva no histórico
+- Botão de histórico (ícone de relógio) no cabeçalho para acessar transcrições anteriores
+- Cada item do histórico mostra: data/hora, preview do texto
+- Ações disponíveis: Carregar (restaura a transcrição), Exportar (baixa como .txt), Excluir
+- Limite de 50 transcrições no histórico
+- Dados persistidos via localStorage
+
 ### Funções Rápidas
 - Analisar: analisa a transcrição atual
 - Resumir: cria resumo do conteúdo
