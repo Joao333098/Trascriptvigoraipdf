@@ -65,3 +65,9 @@ externalPort = 3002
 [[ports]]
 localPort = 44691
 externalPort = 3000
+
+[userenv]
+
+[userenv.shared]
+PASSWORD_HASH = "$2b$10$QYUl7nxe3XUK7zkHmthwXuqxAEK6E7Ujg5Odf79pVbL0RD570JhZi"
+JWT_SECRET = "musi_secret_key_2024_very_secure_random_string"

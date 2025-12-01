@@ -4,8 +4,38 @@ const path = require('path');
 const { ZhipuAI } = require('zhipuai-sdk-nodejs-v4');
 const https = require('https');
 const FormData = require('form-data');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 const PORT = 5000;
+const JWT_SECRET = process.env.JWT_SECRET || 'musi_default_secret_key_2024';
+const PASSWORD_HASH = process.env.PASSWORD_HASH || '$2b$10$QYUl7nxe3XUK7zkHmthwXuqxAEK6E7Ujg5Odf79pVbL0RD570JhZi';
+
+function parseCookies(cookieHeader) {
+    const cookies = {};
+    if (cookieHeader) {
+        cookieHeader.split(';').forEach(cookie => {
+            const parts = cookie.split('=');
+            cookies[parts[0].trim()] = (parts[1] || '').trim();
+        });
+    }
+    return cookies;
+}
+
+function verifyToken(token) {
+    try {
+        return jwt.verify(token, JWT_SECRET);
+    } catch (error) {
+        return null;
+    }
+}
+
+function isAuthenticated(req) {
+    const cookies = parseCookies(req.headers.cookie);
+    const token = cookies.musi_auth;
+    if (!token) return false;
+    return verifyToken(token) !== null;
+}
 
 // Carregar configuração
 const config = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf-8'));
@@ -685,6 +715,75 @@ const server = http.createServer((req, res) => {
         return;
     }
 
+    if (req.method === 'POST' && req.url === '/api/login') {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try {
+                const { password } = JSON.parse(body);
+                
+                if (bcrypt.compareSync(password, PASSWORD_HASH)) {
+                    const token = jwt.sign({ authenticated: true }, JWT_SECRET, { expiresIn: '24h' });
+                    
+                    res.writeHead(200, { 
+                        'Content-Type': 'application/json',
+                        'Set-Cookie': `musi_auth=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Strict`
+                    });
+                    res.end(JSON.stringify({ success: true }));
+                } else {
+                    res.writeHead(401, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ success: false, error: 'Senha incorreta' }));
+                }
+            } catch (error) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ success: false, error: 'Erro no login' }));
+            }
+        });
+        return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/check-auth') {
+        const authenticated = isAuthenticated(req);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ authenticated }));
+        return;
+    }
+
+    if (req.url === '/login' || req.url === '/login.html') {
+        fs.readFile(path.join(__dirname, 'public', 'login.html'), (err, content) => {
+            if (err) {
+                res.writeHead(500);
+                res.end('Server Error');
+            } else {
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(content);
+            }
+        });
+        return;
+    }
+
+    if (req.url === '/style.css' || req.url === '/login.css') {
+        const cssFile = req.url === '/login.css' ? 'login.css' : 'style.css';
+        fs.readFile(path.join(__dirname, 'public', cssFile), (err, content) => {
+            if (err) {
+                res.writeHead(404);
+                res.end('Not Found');
+            } else {
+                res.writeHead(200, { 'Content-Type': 'text/css' });
+                res.end(content);
+            }
+        });
+        return;
+    }
+
+    if (req.url === '/' || req.url === '/index.html') {
+        if (!isAuthenticated(req)) {
+            res.writeHead(302, { 'Location': '/login' });
+            res.end();
+            return;
+        }
+    }
+
     if (req.method === 'POST' && req.url === '/api/upload-pdf') {
         handlePdfUpload(req, res);
         return;
@@ -740,5 +839,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`Transcript AI server running at http://0.0.0.0:${PORT}`);
+    console.log(`Musi server running at http://0.0.0.0:${PORT}`);
 });

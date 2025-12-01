@@ -445,30 +445,11 @@ document.addEventListener('DOMContentLoaded', function() {
     async function finalizeSimpleCaption(text) {
         clearPlaceholder();
 
-        const thinkingEnabled = isThinkingModeEnabled();
-
         const captionBlock = document.createElement('div');
         captionBlock.className = 'caption-block simple';
-
-        if (thinkingEnabled) {
-            captionBlock.classList.add('with-summary');
-            captionBlock.innerHTML = `
-                <div class="caption-original">${escapeHtml(text)}</div>
-                <div class="caption-summary">
-                    <div class="summary-loading">
-                        <svg class="thinking-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 6v6l4 2"/>
-                        </svg>
-                        <span>resumindo...</span>
-                    </div>
-                </div>
-            `;
-        } else {
-            captionBlock.innerHTML = `
-                <div class="caption-original">${escapeHtml(text)}</div>
-            `;
-        }
+        captionBlock.innerHTML = `
+            <div class="caption-original">${escapeHtml(text)}</div>
+        `;
 
         if (currentCaptionBlock) {
             currentCaptionBlock.remove();
@@ -478,66 +459,16 @@ document.addEventListener('DOMContentLoaded', function() {
         liveTranscriptContent.appendChild(captionBlock);
         captionBlocks.push(captionBlock);
         scrollToBottom();
-
-        if (thinkingEnabled && text.length > 20) {
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        message: `Resuma em uma frase curta e objetiva: "${text}"`,
-                        history: [],
-                        transcript: '',
-                        systemPrompt: 'Você é um assistente de resumo. Retorne APENAS o resumo em uma frase curta, sem explicações.',
-                        thinkingMode: true
-                    })
-                });
-                const data = await response.json();
-                const summaryDiv = captionBlock.querySelector('.caption-summary');
-
-                if (data.response && !data.error) {
-                    summaryDiv.innerHTML = `<span class="summary-text">${escapeHtml(data.response)}</span>`;
-                    captionBlock.classList.add('summarized');
-                } else {
-                    summaryDiv.remove();
-                }
-            } catch (error) {
-                console.error('Summary error:', error);
-                const summaryDiv = captionBlock.querySelector('.caption-summary');
-                if (summaryDiv) summaryDiv.remove();
-            }
-        }
-
-        scrollToBottom();
     }
 
     async function finalizeCaptionWithTranslation(originalText) {
         clearPlaceholder();
 
-        const thinkingEnabled = isThinkingModeEnabled();
-
         const captionBlock = document.createElement('div');
         captionBlock.className = 'caption-block';
 
-        let summaryHtml = '';
-        if (thinkingEnabled) {
-            captionBlock.classList.add('with-summary');
-            summaryHtml = `
-                <div class="caption-summary">
-                    <div class="summary-loading">
-                        <svg class="thinking-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="10"/>
-                            <path d="M12 6v6l4 2"/>
-                        </svg>
-                        <span>resumindo...</span>
-                    </div>
-                </div>
-            `;
-        }
-
         captionBlock.innerHTML = `
             <div class="caption-original">${escapeHtml(originalText)}</div>
-            ${summaryHtml}
             <div class="caption-translation">
                 <div class="translation-loading">
                     <span class="dot"></span>
@@ -556,66 +487,32 @@ document.addEventListener('DOMContentLoaded', function() {
         captionBlocks.push(captionBlock);
         scrollToBottom();
 
-        const translatePromise = (async () => {
-            try {
-                const targetLang = translateLang ? translateLang.value : 'en';
-                const response = await fetch('/api/translate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        text: originalText,
-                        targetLang: targetLang
-                    })
-                });
+        try {
+            const targetLang = translateLang ? translateLang.value : 'en';
+            const response = await fetch('/api/translate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    text: originalText,
+                    targetLang: targetLang
+                })
+            });
 
-                const data = await response.json();
-                const translationDiv = captionBlock.querySelector('.caption-translation');
+            const data = await response.json();
+            const translationDiv = captionBlock.querySelector('.caption-translation');
 
-                if (data.error) {
-                    translationDiv.innerHTML = `<span class="translation-error">Erro na tradução</span>`;
-                } else {
-                    translationDiv.innerHTML = `<span class="translated-text">${escapeHtml(data.translation)}</span>`;
-                    captionBlock.classList.add('translated');
-                }
-            } catch (error) {
-                console.error('Translation error:', error);
-                const translationDiv = captionBlock.querySelector('.caption-translation');
+            if (data.error) {
                 translationDiv.innerHTML = `<span class="translation-error">Erro na tradução</span>`;
+            } else {
+                translationDiv.innerHTML = `<span class="translated-text">${escapeHtml(data.translation)}</span>`;
+                captionBlock.classList.add('translated');
             }
-        })();
+        } catch (error) {
+            console.error('Translation error:', error);
+            const translationDiv = captionBlock.querySelector('.caption-translation');
+            translationDiv.innerHTML = `<span class="translation-error">Erro na tradução</span>`;
+        }
 
-        const summaryPromise = (async () => {
-            if (thinkingEnabled && originalText.length > 20) {
-                try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            message: `Resuma em uma frase curta e objetiva: "${originalText}"`,
-                            history: [],
-                            transcript: '',
-                            systemPrompt: 'Você é um assistente de resumo. Retorne APENAS o resumo em uma frase curta, sem explicações.',
-                            thinkingMode: true
-                        })
-                    });
-                    const data = await response.json();
-                    const summaryDiv = captionBlock.querySelector('.caption-summary');
-
-                    if (data.response && !data.error && summaryDiv) {
-                        summaryDiv.innerHTML = `<span class="summary-text">${escapeHtml(data.response)}</span>`;
-                        captionBlock.classList.add('summarized');
-                    } else if (summaryDiv) {
-                        summaryDiv.remove();
-                    }
-                } catch (error) {
-                    console.error('Summary error:', error);
-                    const summaryDiv = captionBlock.querySelector('.caption-summary');
-                    if (summaryDiv) summaryDiv.remove();
-                }
-            }
-        })();
-
-        await Promise.all([translatePromise, summaryPromise]);
         scrollToBottom();
     }
 
@@ -1435,5 +1332,5 @@ document.addEventListener('DOMContentLoaded', function() {
     loadFromLocalStorage();
     loadChatHistory();
 
-    console.log('Transcript AI with Visual PDF Analysis initialized successfully');
+    console.log('Musi initialized successfully');
 });
