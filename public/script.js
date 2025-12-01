@@ -1635,6 +1635,92 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     checkAuth();
+    // Sistema de notificação de resumo
+    let summaryNotificationInterval = null;
+    let summaryActive = false;
+    
+    function showSummaryNotification(message) {
+        const notification = document.getElementById('summaryNotification');
+        const notificationText = document.getElementById('summaryNotificationText');
+        
+        if (notification && notificationText) {
+            notificationText.textContent = message;
+            notification.style.display = 'flex';
+            
+            // Auto-ocultar após 10 segundos
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 10000);
+        }
+    }
+    
+    function startSummaryNotifications() {
+        if (summaryNotificationInterval) {
+            clearInterval(summaryNotificationInterval);
+        }
+        
+        summaryActive = true;
+        showSummaryNotification('Resumo automático ativado - Gerando resumos a cada 30 segundos');
+        
+        summaryNotificationInterval = setInterval(() => {
+            if (summaryActive && fullTranscript) {
+                showSummaryNotification('Gerando novo resumo da transcrição...');
+                
+                // Gerar resumo automaticamente
+                setTimeout(async () => {
+                    try {
+                        const response = await fetch('/api/chat', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: 'Faça um resumo breve dos últimos pontos importantes da transcrição',
+                                history: chatHistory.slice(-5),
+                                transcript: fullTranscript,
+                                systemPrompt: 'Você é especialista em criar resumos concisos.',
+                                thinkingMode: false
+                            })
+                        });
+                        
+                        const data = await response.json();
+                        if (data.response) {
+                            showSummaryNotification(`Resumo: ${data.response.substring(0, 150)}...`);
+                        }
+                    } catch (error) {
+                        console.error('Erro ao gerar resumo automático:', error);
+                    }
+                }, 1000);
+            }
+        }, 30000); // 30 segundos
+    }
+    
+    function stopSummaryNotifications() {
+        summaryActive = false;
+        if (summaryNotificationInterval) {
+            clearInterval(summaryNotificationInterval);
+            summaryNotificationInterval = null;
+        }
+        showSummaryNotification('Resumo automático desativado');
+    }
+    
+    // Botão para fechar notificação
+    const closeSummaryBtn = document.getElementById('closeSummaryNotification');
+    if (closeSummaryBtn) {
+        closeSummaryBtn.addEventListener('click', () => {
+            document.getElementById('summaryNotification').style.display = 'none';
+        });
+    }
+    
+    // Modificar o botão de resumir para ativar/desativar modo automático
+    const originalSummarizeClick = summarizeBtn.onclick;
+    summarizeBtn.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        if (summaryActive) {
+            stopSummaryNotifications();
+        } else {
+            startSummaryNotifications();
+        }
+    });
+
     loadFromLocalStorage();
     loadChatHistory();
     updateSelectedLanguagesText();

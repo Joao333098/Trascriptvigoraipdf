@@ -200,6 +200,123 @@ body {
     z-index: 1;
 }
 
+.summary-notification {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    background: linear-gradient(135deg, rgba(155, 89, 182, 0.15), rgba(142, 68, 173, 0.08));
+    border: 1px solid rgba(155, 89, 182, 0.3);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 32px rgba(155, 89, 182, 0.2);
+    animation: slideDown 0.5s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-notification::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #9b59b6, #8e44ad, #9b59b6);
+    background-size: 200% 100%;
+    animation: shimmerPurple 3s linear infinite;
+}
+
+@keyframes shimmerPurple {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.notification-icon {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, rgba(155, 89, 182, 0.2), rgba(142, 68, 173, 0.3));
+    border: 2px solid rgba(155, 89, 182, 0.4);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #9b59b6;
+    animation: iconPulse 2s ease-in-out infinite;
+    box-shadow: 0 0 20px rgba(155, 89, 182, 0.3);
+}
+
+@keyframes iconPulse {
+    0%, 100% { 
+        transform: scale(1); 
+        box-shadow: 0 0 20px rgba(155, 89, 182, 0.3);
+    }
+    50% { 
+        transform: scale(1.05); 
+        box-shadow: 0 0 30px rgba(155, 89, 182, 0.5);
+    }
+}
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-content h3 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #9b59b6;
+    margin: 0 0 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notification-content p {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.5;
+}
+
+.notification-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.notification-close-btn {
+    width: 36px;
+    height: 36px;
+    background: rgba(155, 89, 182, 0.1);
+    border: 1px solid rgba(155, 89, 182, 0.2);
+    border-radius: var(--radius-md);
+    color: #9b59b6;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--transition);
+}
+
+.notification-close-btn:hover {
+    background: rgba(155, 89, 182, 0.2);
+    border-color: rgba(155, 89, 182, 0.4);
+    transform: scale(1.05);
+}
+
 .pdf-analysis-section {
     grid-column: 1 / -1;
     margin-bottom: 20px;
