@@ -1,12 +1,12 @@
 entrypoint = "index.js"
-modules = ["nodejs-22"]
+modules = ["nodejs-20", "web"]
 hidden = [".config", "package-lock.json"]
 
 [gitHubImport]
 requiredFiles = [".replit", "replit.nix", "package.json", "package-lock.json"]
 
 [nix]
-channel = "stable-24_11"
+channel = "stable-25_05"
 packages = ["unzip"]
 
 [deployment]
@@ -53,6 +53,10 @@ outputType = "webview"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 36285
+externalPort = 3001
 
 [[ports]]
 localPort = 44691
