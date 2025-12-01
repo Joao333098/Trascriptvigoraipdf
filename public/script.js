@@ -966,6 +966,9 @@ document.addEventListener('DOMContentLoaded', function() {
         summarizeBtn.addEventListener('click', async function() {
             if (chatModal) chatModal.classList.add('active');
 
+            const thinkingModeEl = document.getElementById('thinkingMode');
+            const thinkingMode = thinkingModeEl ? thinkingModeEl.checked : false;
+
             const message = 'Faça um resumo completo e detalhado da transcrição';
             addMessageToChat('user', message);
             chatHistory.push({ role: 'user', content: message });
@@ -981,7 +984,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         history: chatHistory.slice(-10),
                         transcript: fullTranscript,
                         systemPrompt: 'Você é especialista em criar resumos concisos e informativos.',
-                        thinkingMode: false
+                        thinkingMode: thinkingMode
                     })
                 });
                 const data = await response.json();
@@ -1329,6 +1332,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    async function checkAuth() {
+        try {
+            const response = await fetch('/api/check-auth');
+            const data = await response.json();
+            if (!data.authenticated) {
+                window.location.href = '/login';
+            }
+        } catch (error) {
+            console.error('Auth check error:', error);
+        }
+    }
+
+    checkAuth();
     loadFromLocalStorage();
     loadChatHistory();
 
