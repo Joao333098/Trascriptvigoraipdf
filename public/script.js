@@ -7,8 +7,12 @@ document.addEventListener('DOMContentLoaded', function() {
     const liveTranscriptContainer = document.getElementById('liveTranscriptContainer');
     const audioVisualizer = document.getElementById('audioVisualizer');
     const translateToggle = document.getElementById('translateToggle');
-    const sourceLang = document.getElementById('sourceLang');
     const translateLang = document.getElementById('translateLang');
+    
+    const langSelectorBtn = document.getElementById('langSelectorBtn');
+    const langDropdown = document.getElementById('langDropdown');
+    const selectedLangsText = document.getElementById('selectedLangsText');
+    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
 
     const chatModal = document.getElementById('chatModal');
     const chatToggleBtn = document.getElementById('chatToggleBtn');
@@ -60,6 +64,10 @@ document.addEventListener('DOMContentLoaded', function() {
     let userScrolled = false;
     let summaryInterval = null;
     let lastSummaryTime = 0;
+    
+    let selectedLanguages = ['pt-BR'];
+    let currentLangIndex = 0;
+    let recognitionInstances = {};
 
     let pdfDoc = null;
     let currentPage = 1;
@@ -77,71 +85,155 @@ document.addEventListener('DOMContentLoaded', function() {
     const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
     function initSpeechRecognition() {
-        if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            recognition = new SpeechRecognition();
-            recognition.continuous = true;
-            recognition.interimResults = true;
-            recognition.lang = sourceLang.value;
-
-            recognition.onstart = function() {
-                isRecording = true;
-                micBtn.classList.add('recording');
-                micBtn.querySelector('.mic-text').textContent = 'Parar';
-                audioVisualizer.classList.add('active');
-                
-                if (pdfDoc) {
-                    startScanAnimation();
-                }
-            };
-
-            recognition.onend = function() {
-                if (isRecording) {
-                    recognition.start();
-                }
-            };
-
-            recognition.onresult = function(event) {
-                let interimTranscript = '';
-                let finalTranscript = '';
-
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    const transcript = event.results[i][0].transcript;
-                    if (event.results[i].isFinal) {
-                        finalTranscript += transcript;
-                    } else {
-                        interimTranscript += transcript;
-                    }
-                }
-
-                if (interimTranscript) {
-                    updateCurrentCaption(interimTranscript, true);
-                }
-
-                if (finalTranscript) {
-                    fullTranscript += finalTranscript + ' ';
-                    saveToLocalStorage();
-
-                    if (pdfText && pdfText.length > 0) {
-                        analyzePdfContext(finalTranscript.trim());
-                    }
-
-                    if (isTranslationActive) {
-                        finalizeCaptionWithTranslation(finalTranscript.trim());
-                    } else {
-                        finalizeSimpleCaption(finalTranscript.trim());
-                    }
-                }
-            };
-
-            recognition.onerror = function(event) {
-                console.error('Speech recognition error:', event.error);
-                if (event.error === 'not-allowed') {
-                    alert('Por favor, permita o acesso ao microfone para usar a transcrição.');
-                }
-            };
-        } else {
+        if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
             alert('Seu navegador não suporta reconhecimento de fala. Use Chrome ou Edge.');
+            return;
+        }
+        
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        // Criar instâncias de reconhecimento para cada idioma selecionado
+        selectedLanguages.forEach(lang => {
+            if (!recognitionInstances[lang]) {
+                const rec = new SpeechRecognition();
+                rec.continuous = true;
+                rec.interimResults = true;
+                rec.lang = lang;
+                rec.maxAlternatives = 3;
+                
+                rec.onresult = function(event) {
+                    let interimTranscript = '';
+                    let finalTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        const confidence = event.results[i][0].confidence;
+                        
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript;
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+
+                    if (interimTranscript) {
+                        updateCurrentCaption(interimTranscript, true);
+                    }
+
+                    if (finalTranscript) {
+                        fullTranscript += finalTranscript + ' ';
+                        saveToLocalStorage();
+
+                        if (pdfText && pdfText.length > 0) {
+                            analyzePdfContext(finalTranscript.trim());
+                        }
+
+                        if (isTranslationActive) {
+                            finalizeCaptionWithTranslation(finalTranscript.trim());
+                        } else {
+                            finalizeSimpleCaption(finalTranscript.trim());
+                        }
+                        
+                        // Alternar para o próximo idioma
+                        rotateLanguage();
+                    }
+                };
+                
+                rec.onerror = function(event) {
+                    console.error(`Speech recognition error (${lang}):`, event.error);
+                    if (event.error === 'not-allowed') {
+                        alert('Por favor, permita o acesso ao microfone para usar a transcrição.');
+                    } else if (event.error === 'no-speech') {
+                        // Silenciosamente alternar para o próximo idioma
+                        rotateLanguage();
+                    }
+                };
+                
+                rec.onend = function() {
+                    if (isRecording && recognitionInstances[lang]) {
+                        // Reiniciar automaticamente se ainda estiver gravando
+                        setTimeout(() => {
+                            if (isRecording) {
+                                try {
+                                    rec.start();
+                                } catch (e) {
+                                    console.log('Reconhecimento já ativo');
+                                }
+                            }
+                        }, 100);
+                    }
+                };
+                
+                recognitionInstances[lang] = rec;
+            }
+        });
+        
+        // Usar a primeira instância como principal
+        recognition = recognitionInstances[selectedLanguages[0]];
+    }
+    
+    function rotateLanguage() {
+        if (selectedLanguages.length <= 1) return;
+        
+        // Parar o reconhecimento atual
+        const currentLang = selectedLanguages[currentLangIndex];
+        if (recognitionInstances[currentLang]) {
+            try {
+                recognitionInstances[currentLang].stop();
+            } catch (e) {
+                console.log('Erro ao parar reconhecimento');
+            }
+        }
+        
+        // Ir para o próximo idioma
+        currentLangIndex = (currentLangIndex + 1) % selectedLanguages.length;
+        const nextLang = selectedLanguages[currentLangIndex];
+        
+        // Iniciar o próximo reconhecimento
+        if (recognitionInstances[nextLang] && isRecording) {
+            setTimeout(() => {
+                try {
+                    recognitionInstances[nextLang].start();
+                    recognition = recognitionInstances[nextLang];
+                } catch (e) {
+                    console.log('Reconhecimento já ativo');
+                }
+            }, 100);
+        }
+    }
+    
+    function updateSelectedLanguagesText() {
+        const langNames = {
+            'pt-BR': 'PT',
+            'en-US': 'EN',
+            'es-ES': 'ES',
+            'fr-FR': 'FR',
+            'de-DE': 'DE',
+            'it-IT': 'IT',
+            'ja-JP': 'JP',
+            'zh-CN': 'CN',
+            'ko-KR': 'KR',
+            'ru-RU': 'RU'
+        };
+        
+        if (selectedLanguages.length === 0) {
+            selectedLangsText.textContent = 'Selecione idiomas';
+        } else if (selectedLanguages.length === 1) {
+            const fullNames = {
+                'pt-BR': 'Português',
+                'en-US': 'English',
+                'es-ES': 'Español',
+                'fr-FR': 'Français',
+                'de-DE': 'Deutsch',
+                'it-IT': 'Italiano',
+                'ja-JP': '日本語',
+                'zh-CN': '中文',
+                'ko-KR': '한국어',
+                'ru-RU': 'Русский'
+            };
+            selectedLangsText.textContent = fullNames[selectedLanguages[0]];
+        } else {
+            selectedLangsText.textContent = selectedLanguages.map(l => langNames[l]).join(' + ');
         }
     }
 
@@ -604,20 +696,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (micBtn) {
         micBtn.addEventListener('click', function() {
-            if (!recognition) {
+            if (selectedLanguages.length === 0) {
+                alert('Por favor, selecione pelo menos um idioma para transcrição.');
+                return;
+            }
+            
+            if (!recognition || Object.keys(recognitionInstances).length === 0) {
                 initSpeechRecognition();
             }
 
             if (isRecording) {
                 isRecording = false;
-                recognition.stop();
+                stopAllRecognitions();
                 micBtn.classList.remove('recording');
                 micBtn.querySelector('.mic-text').textContent = 'Iniciar';
                 audioVisualizer.classList.remove('active');
                 stopScanAnimation();
             } else {
-                recognition.lang = sourceLang.value;
-                recognition.start();
+                startAllRecognitions();
             }
         });
     }
@@ -722,12 +818,86 @@ document.addEventListener('DOMContentLoaded', function() {
         translateLang.style.display = 'none';
     }
 
-    if (sourceLang) {
-        sourceLang.addEventListener('change', function() {
-            if (recognition) {
-                recognition.lang = this.value;
+    if (langSelectorBtn && langDropdown) {
+        langSelectorBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            langDropdown.classList.toggle('active');
+        });
+        
+        document.addEventListener('click', function(e) {
+            if (!langDropdown.contains(e.target) && e.target !== langSelectorBtn) {
+                langDropdown.classList.remove('active');
             }
         });
+        
+        const langCheckboxes = langDropdown.querySelectorAll('input[type="checkbox"]');
+        langCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                selectedLanguages = Array.from(langCheckboxes)
+                    .filter(cb => cb.checked)
+                    .map(cb => cb.value);
+                
+                if (selectedLanguages.length === 0) {
+                    this.checked = true;
+                    selectedLanguages = [this.value];
+                }
+                
+                updateSelectedLanguagesText();
+                
+                // Re-inicializar reconhecimento se estiver gravando
+                if (isRecording) {
+                    stopAllRecognitions();
+                    initSpeechRecognition();
+                    startAllRecognitions();
+                } else {
+                    // Criar novas instâncias para os idiomas selecionados
+                    recognitionInstances = {};
+                    initSpeechRecognition();
+                }
+            });
+        });
+        
+        if (clearSelectionBtn) {
+            clearSelectionBtn.addEventListener('click', function() {
+                langCheckboxes.forEach(cb => cb.checked = false);
+                langCheckboxes[0].checked = true;
+                selectedLanguages = [langCheckboxes[0].value];
+                updateSelectedLanguagesText();
+            });
+        }
+    }
+    
+    function stopAllRecognitions() {
+        Object.values(recognitionInstances).forEach(rec => {
+            try {
+                rec.stop();
+            } catch (e) {
+                console.log('Erro ao parar reconhecimento');
+            }
+        });
+    }
+    
+    function startAllRecognitions() {
+        isRecording = true;
+        micBtn.classList.add('recording');
+        micBtn.querySelector('.mic-text').textContent = 'Parar';
+        audioVisualizer.classList.add('active');
+        
+        if (pdfDoc) {
+            startScanAnimation();
+        }
+        
+        // Iniciar apenas o primeiro idioma
+        currentLangIndex = 0;
+        const firstLang = selectedLanguages[0];
+        if (recognitionInstances[firstLang]) {
+            try {
+                recognitionInstances[firstLang].start();
+                recognition = recognitionInstances[firstLang];
+            } catch (e) {
+                console.log('Reconhecimento já ativo');
+            }
+        }
     }
 
     if (chatToggleBtn && chatModal) {
@@ -1467,6 +1637,7 @@ document.addEventListener('DOMContentLoaded', function() {
     checkAuth();
     loadFromLocalStorage();
     loadChatHistory();
+    updateSelectedLanguagesText();
 
     console.log('Musi initialized successfully');
 });

@@ -164,16 +164,64 @@
                     Transcrição ao Vivo
                 </h2>
                 <div class="transcript-controls">
-                    <div class="audio-lang-group">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                        </svg>
-                        <select class="lang-select audio-lang" id="sourceLang">
-                            <option value="pt-BR">Português</option>
-                            <option value="en-US">English</option>
-                            <option value="es-ES">Español</option>
-                        </select>
+                    <div class="multi-lang-selector" id="multiLangSelector">
+                        <button class="lang-selector-btn" id="langSelectorBtn">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <line x1="2" x2="22" y1="12" y2="12"/>
+                                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                            </svg>
+                            <span id="selectedLangsText">Português</span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="6 9 12 15 18 9"/>
+                            </svg>
+                        </button>
+                        <div class="lang-dropdown" id="langDropdown">
+                            <div class="lang-dropdown-header">
+                                <span>Selecione os idiomas</span>
+                                <button class="clear-selection-btn" id="clearSelectionBtn">Limpar</button>
+                            </div>
+                            <label class="lang-option">
+                                <input type="checkbox" value="pt-BR" checked>
+                                <span>🇧🇷 Português (Brasil)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="en-US">
+                                <span>🇺🇸 English (US)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="es-ES">
+                                <span>🇪🇸 Español (España)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="fr-FR">
+                                <span>🇫🇷 Français (France)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="de-DE">
+                                <span>🇩🇪 Deutsch (Deutschland)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="it-IT">
+                                <span>🇮🇹 Italiano (Italia)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="ja-JP">
+                                <span>🇯🇵 日本語 (日本)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="zh-CN">
+                                <span>🇨🇳 中文 (简体)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="ko-KR">
+                                <span>🇰🇷 한국어 (한국)</span>
+                            </label>
+                            <label class="lang-option">
+                                <input type="checkbox" value="ru-RU">
+                                <span>🇷🇺 Русский (Россия)</span>
+                            </label>
+                        </div>
                     </div>
                     <div class="translation-controls">
                         <button class="control-btn translation-toggle" id="translateToggle" title="Tradução ao Vivo">
@@ -387,24 +435,6 @@
                         </div>
                     </div>
                     <div id="pdfStatus" class="pdf-status"></div>
-                </div>
-
-                <div class="setting-group">
-                    <label>Idiomas de Transcrição</label>
-                    <div class="checkbox-group">
-                        <label class="checkbox-item">
-                            <input type="checkbox" value="pt-BR" checked>
-                            <span>Português</span>
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" value="en-US">
-                            <span>English</span>
-                        </label>
-                        <label class="checkbox-item">
-                            <input type="checkbox" value="es-ES">
-                            <span>Español</span>
-                        </label>
-                    </div>
                 </div>
 
                 <div class="setting-group">
