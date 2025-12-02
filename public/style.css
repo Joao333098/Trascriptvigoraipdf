@@ -33,6 +33,31 @@
     animation: slideUp 0.5s ease;
 }
 
+.modal-close-x {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 40px;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    z-index: 10;
+}
+
+.modal-close-x:hover {
+    background: rgba(255, 60, 60, 0.2);
+    border-color: rgba(255, 60, 60, 0.4);
+    color: #ff6b6b;
+    transform: rotate(90deg);
+}
+
 @keyframes slideUp {
     from { 
         opacity: 0;
@@ -2346,6 +2371,87 @@ body {
 .toggle-input:checked + .toggle-slider::before {
     transform: translateX(20px);
     background: var(--bg-primary);
+}
+
+.access-code-manager {
+    background: rgba(0, 240, 255, 0.05);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+}
+
+.current-code-display {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.code-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.code-value {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 8px;
+    color: #00f0ff;
+    font-family: 'Courier New', monospace;
+    padding: 12px;
+    background: rgba(0, 240, 255, 0.1);
+    border-radius: 12px;
+    margin-bottom: 8px;
+}
+
+.code-expiry {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.code-manager-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.view-code-btn,
+.new-code-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border-radius: var(--radius-md);
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.view-code-btn {
+    background: rgba(0, 240, 255, 0.1);
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    color: var(--neon-glow);
+}
+
+.view-code-btn:hover {
+    background: rgba(0, 240, 255, 0.2);
+    border-color: rgba(0, 240, 255, 0.5);
+    transform: translateY(-2px);
+}
+
+.new-code-btn {
+    background: rgba(0, 255, 136, 0.1);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+    color: var(--success);
+}
+
+.new-code-btn:hover {
+    background: rgba(0, 255, 136, 0.2);
+    border-color: rgba(0, 255, 136, 0.5);
+    transform: translateY(-2px);
 }
 
 .word-modal {

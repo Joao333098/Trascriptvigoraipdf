@@ -923,6 +923,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (settingsBtn && settingsModal) {
         settingsBtn.addEventListener('click', function() {
             settingsModal.classList.add('active');
+            loadCurrentAccessCode();
         });
     }
 
@@ -1648,6 +1649,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const modal = document.getElementById('accessCodeModal');
         const display = document.getElementById('accessCodeDisplay');
         const closeBtn = document.getElementById('closeAccessCodeBtn');
+        const closeXBtn = document.getElementById('closeAccessCodeModalX');
         const copyBtn = document.getElementById('copyCodeBtn');
         const generateBtn = document.getElementById('generateNewBtn');
         
@@ -1655,11 +1657,23 @@ document.addEventListener('DOMContentLoaded', function() {
             display.textContent = code;
             modal.style.display = 'flex';
             
+            const closeModal = () => {
+                modal.style.display = 'none';
+            };
+            
             if (closeBtn) {
-                closeBtn.onclick = () => {
-                    modal.style.display = 'none';
-                };
+                closeBtn.onclick = closeModal;
             }
+            
+            if (closeXBtn) {
+                closeXBtn.onclick = closeModal;
+            }
+            
+            modal.onclick = (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            };
             
             if (copyBtn) {
                 copyBtn.onclick = async () => {
@@ -1690,6 +1704,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         const data = await response.json();
                         if (data.accessCode) {
                             display.textContent = data.accessCode;
+                            updateCurrentCodeDisplay(data.accessCode, data.expiresAt);
                             
                             const originalText = generateBtn.innerHTML;
                             generateBtn.innerHTML = `
@@ -1708,6 +1723,70 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
             }
         }
+    }
+
+    async function loadCurrentAccessCode() {
+        try {
+            const response = await fetch('/api/get-access-code');
+            const data = await response.json();
+            if (data.accessCode) {
+                updateCurrentCodeDisplay(data.accessCode, data.expiresAt);
+            }
+        } catch (err) {
+            console.error('Erro ao carregar código:', err);
+        }
+    }
+
+    function updateCurrentCodeDisplay(code, expiresAt) {
+        const codeDisplay = document.getElementById('currentCodeDisplay');
+        const expiryDisplay = document.getElementById('codeExpiryDisplay');
+        
+        if (codeDisplay) {
+            codeDisplay.textContent = code || '------';
+        }
+        
+        if (expiryDisplay && expiresAt) {
+            const expiry = new Date(expiresAt);
+            const now = new Date();
+            const hoursLeft = Math.round((expiry - now) / (1000 * 60 * 60));
+            expiryDisplay.textContent = hoursLeft > 0 ? `Expira em ${hoursLeft}h` : 'Código expirado';
+        } else if (expiryDisplay) {
+            expiryDisplay.textContent = 'Nenhum código ativo';
+        }
+    }
+
+    const viewCodeBtn = document.getElementById('viewCodeBtn');
+    const generateCodeBtn = document.getElementById('generateCodeBtn');
+
+    if (viewCodeBtn) {
+        viewCodeBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/get-access-code');
+                const data = await response.json();
+                if (data.accessCode) {
+                    showAccessCodeModal(data.accessCode);
+                }
+            } catch (err) {
+                console.error('Erro ao visualizar código:', err);
+            }
+        });
+    }
+
+    if (generateCodeBtn) {
+        generateCodeBtn.addEventListener('click', async () => {
+            try {
+                const response = await fetch('/api/generate-new-code', {
+                    method: 'POST'
+                });
+                const data = await response.json();
+                if (data.accessCode) {
+                    updateCurrentCodeDisplay(data.accessCode, data.expiresAt);
+                    showAccessCodeModal(data.accessCode);
+                }
+            } catch (err) {
+                console.error('Erro ao gerar código:', err);
+            }
+        });
     }
 
     checkAuth();
