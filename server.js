@@ -7,7 +7,7 @@ const FormData = require('form-data');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
-const PORT = 5000;
+const PORT = 4000;
 const JWT_SECRET = process.env.JWT_SECRET || 'musi_default_secret_key_2024';
 // Hash bcrypt para senha: vovo666123
 const PASSWORD_HASH = process.env.PASSWORD_HASH || '$2b$10$uJfAOt5zmp2c0CB5bRgA6e4q6pr3cNJQ8S7YD2583QbHpHFuJhGbm';
@@ -791,6 +791,22 @@ const server = http.createServer((req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ 
             accessCode: currentAccessCode,
+            expiresAt: accessCodeExpiry
+        }));
+        return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/generate-new-code') {
+        if (!isAuthenticated(req)) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Não autenticado' }));
+            return;
+        }
+        
+        const newCode = generateAccessCode();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            accessCode: newCode,
             expiresAt: accessCodeExpiry
         }));
         return;

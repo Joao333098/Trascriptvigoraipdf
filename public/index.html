@@ -67,11 +67,38 @@
 
         <div class="access-code-modal" id="accessCodeModal" style="display: none;">
             <div class="access-code-content">
-                <h3>🔐 Código de Acesso Gerado</h3>
-                <p>Compartilhe este código para permitir acesso:</p>
+                <h3>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                    </svg>
+                    Código de Acesso Gerado
+                </h3>
+                <p>Compartilhe este código para permitir acesso sem senha:</p>
                 <div class="access-code-display" id="accessCodeDisplay">------</div>
-                <p class="access-code-hint">Este código é válido por 24 horas</p>
-                <button class="close-code-btn" id="closeAccessCodeBtn">Fechar</button>
+                <p class="access-code-hint">Válido por 24 horas</p>
+                <div class="code-actions">
+                    <button class="copy-code-btn" id="copyCodeBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect width="14" height="14" x="8" y="8" rx="2" ry="2"/>
+                            <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>
+                        </svg>
+                        Copiar
+                    </button>
+                    <button class="generate-new-btn" id="generateNewBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+                        </svg>
+                        Novo Código
+                    </button>
+                    <button class="close-code-btn" id="closeAccessCodeBtn">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" x2="6" y1="6" y2="18"/>
+                            <line x1="6" x2="18" y1="6" y2="18"/>
+                        </svg>
+                        Fechar
+                    </button>
+                </div>
             </div>
         </div>
             </div>

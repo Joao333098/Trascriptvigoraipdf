@@ -1648,6 +1648,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const modal = document.getElementById('accessCodeModal');
         const display = document.getElementById('accessCodeDisplay');
         const closeBtn = document.getElementById('closeAccessCodeBtn');
+        const copyBtn = document.getElementById('copyCodeBtn');
+        const generateBtn = document.getElementById('generateNewBtn');
         
         if (modal && display) {
             display.textContent = code;
@@ -1656,6 +1658,53 @@ document.addEventListener('DOMContentLoaded', function() {
             if (closeBtn) {
                 closeBtn.onclick = () => {
                     modal.style.display = 'none';
+                };
+            }
+            
+            if (copyBtn) {
+                copyBtn.onclick = async () => {
+                    try {
+                        await navigator.clipboard.writeText(code);
+                        const originalText = copyBtn.innerHTML;
+                        copyBtn.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                            Copiado!
+                        `;
+                        setTimeout(() => {
+                            copyBtn.innerHTML = originalText;
+                        }, 2000);
+                    } catch (err) {
+                        console.error('Erro ao copiar:', err);
+                    }
+                };
+            }
+            
+            if (generateBtn) {
+                generateBtn.onclick = async () => {
+                    try {
+                        const response = await fetch('/api/generate-new-code', {
+                            method: 'POST'
+                        });
+                        const data = await response.json();
+                        if (data.accessCode) {
+                            display.textContent = data.accessCode;
+                            
+                            const originalText = generateBtn.innerHTML;
+                            generateBtn.innerHTML = `
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20 6 9 17 4 12"/>
+                                </svg>
+                                Gerado!
+                            `;
+                            setTimeout(() => {
+                                generateBtn.innerHTML = originalText;
+                            }, 2000);
+                        }
+                    } catch (err) {
+                        console.error('Erro ao gerar novo código:', err);
+                    }
                 };
             }
         }
