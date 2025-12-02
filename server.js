@@ -10,7 +10,7 @@ const jwt = require('jsonwebtoken');
 const PORT = 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'musi_default_secret_key_2024';
 // Hash bcrypt para senha: vovo666123
-const PASSWORD_HASH = process.env.PASSWORD_HASH || '$2a$10$rvX8pDZKqZzDh3YNj5RV2.eI7N5d3XqYKzGVr6P9lKvJxwW8JN5Gu';
+const PASSWORD_HASH = process.env.PASSWORD_HASH || '$2b$10$uJfAOt5zmp2c0CB5bRgA6e4q6pr3cNJQ8S7YD2583QbHpHFuJhGbm';
 
 function parseCookies(cookieHeader) {
     const cookies = {};
