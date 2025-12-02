@@ -244,6 +244,33 @@
         .shake {
             animation: shake 0.3s ease-in-out;
         }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 12px;
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .divider span {
+            padding: 0 16px;
+        }
+
+        #accessCode {
+            text-align: center;
+            font-size: 24px;
+            letter-spacing: 8px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -276,15 +303,14 @@
 
             <form id="loginForm">
                 <div class="form-group">
-                    <label for="password">Senha</label>
+                    <label for="password">Senha Master</label>
                     <div class="input-wrapper">
                         <input 
                             type="password" 
                             id="password" 
                             name="password" 
-                            placeholder="Digite sua senha"
+                            placeholder="Digite a senha master"
                             autocomplete="current-password"
-                            required
                         >
                         <button type="button" class="toggle-password" id="togglePassword">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -292,6 +318,25 @@
                                 <circle cx="12" cy="12" r="3"/>
                             </svg>
                         </button>
+                    </div>
+                </div>
+
+                <div class="divider">
+                    <span>OU</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="accessCode">Código de Acesso (6 dígitos)</label>
+                    <div class="input-wrapper">
+                        <input 
+                            type="text" 
+                            id="accessCode" 
+                            name="accessCode" 
+                            placeholder="000000"
+                            maxlength="6"
+                            pattern="[0-9]{6}"
+                            autocomplete="off"
+                        >
                     </div>
                 </div>
 
@@ -326,11 +371,19 @@
                    </svg>`;
         });
 
+        const accessCodeInput = document.getElementById('accessCode');
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const password = passwordInput.value;
-            if (!password) return;
+            const accessCode = accessCodeInput.value;
+            
+            if (!password && !accessCode) {
+                errorText.textContent = 'Digite a senha master ou código de acesso';
+                errorMessage.classList.add('show');
+                return;
+            }
 
             loginBtn.classList.add('loading');
             loginBtn.disabled = true;
@@ -340,20 +393,28 @@
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ password })
+                    body: JSON.stringify({ password, accessCode })
                 });
 
                 const data = await response.json();
 
                 if (data.success) {
+                    if (data.accessCode) {
+                        localStorage.setItem('generatedAccessCode', data.accessCode);
+                    }
                     window.location.href = '/';
                 } else {
-                    errorText.textContent = data.error || 'Senha incorreta';
+                    errorText.textContent = data.error || 'Senha ou código incorreto';
                     errorMessage.classList.add('show');
                     form.classList.add('shake');
                     setTimeout(() => form.classList.remove('shake'), 300);
-                    passwordInput.focus();
-                    passwordInput.select();
+                    if (password) {
+                        passwordInput.focus();
+                        passwordInput.select();
+                    } else {
+                        accessCodeInput.focus();
+                        accessCodeInput.select();
+                    }
                 }
             } catch (error) {
                 errorText.textContent = 'Erro de conexão. Tente novamente.';
@@ -362,6 +423,10 @@
                 loginBtn.classList.remove('loading');
                 loginBtn.disabled = false;
             }
+        });
+
+        accessCodeInput.addEventListener('input', function() {
+            this.value = this.value.replace(/[^0-9]/g, '');
         });
 
         passwordInput.addEventListener('input', () => {

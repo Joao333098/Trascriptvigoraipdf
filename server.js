@@ -12,6 +12,27 @@ const JWT_SECRET = process.env.JWT_SECRET || 'musi_default_secret_key_2024';
 // Hash bcrypt para senha: vovo666123
 const PASSWORD_HASH = process.env.PASSWORD_HASH || '$2b$10$uJfAOt5zmp2c0CB5bRgA6e4q6pr3cNJQ8S7YD2583QbHpHFuJhGbm';
 
+// Sistema de código de acesso temporário
+let currentAccessCode = null;
+let accessCodeExpiry = null;
+
+function generateAccessCode() {
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    currentAccessCode = code;
+    accessCodeExpiry = Date.now() + (24 * 60 * 60 * 1000); // 24 horas
+    return code;
+}
+
+function isAccessCodeValid(code) {
+    if (!currentAccessCode || !accessCodeExpiry) return false;
+    if (Date.now() > accessCodeExpiry) {
+        currentAccessCode = null;
+        accessCodeExpiry = null;
+        return false;
+    }
+    return code === currentAccessCode;
+}
+
 function parseCookies(cookieHeader) {
     const cookies = {};
     if (cookieHeader) {
@@ -721,25 +742,57 @@ const server = http.createServer((req, res) => {
         req.on('data', chunk => body += chunk);
         req.on('end', () => {
             try {
-                const { password } = JSON.parse(body);
+                const { password, accessCode } = JSON.parse(body);
                 
-                if (bcrypt.compareSync(password, PASSWORD_HASH)) {
+                let isValid = false;
+                let generatedCode = null;
+                
+                // Verificar se é senha master
+                if (password && bcrypt.compareSync(password, PASSWORD_HASH)) {
+                    isValid = true;
+                    generatedCode = generateAccessCode();
+                }
+                // Verificar se é código de acesso
+                else if (accessCode && isAccessCodeValid(accessCode)) {
+                    isValid = true;
+                }
+                
+                if (isValid) {
                     const token = jwt.sign({ authenticated: true }, JWT_SECRET, { expiresIn: '24h' });
                     
                     res.writeHead(200, { 
                         'Content-Type': 'application/json',
                         'Set-Cookie': `musi_auth=${token}; Path=/; Max-Age=86400; HttpOnly; SameSite=Strict`
                     });
-                    res.end(JSON.stringify({ success: true }));
+                    res.end(JSON.stringify({ 
+                        success: true, 
+                        accessCode: generatedCode,
+                        hasAccessCode: !!currentAccessCode
+                    }));
                 } else {
                     res.writeHead(401, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ success: false, error: 'Senha incorreta' }));
+                    res.end(JSON.stringify({ success: false, error: 'Senha ou código incorreto' }));
                 }
             } catch (error) {
                 res.writeHead(400, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: 'Erro no login' }));
             }
         });
+        return;
+    }
+
+    if (req.method === 'GET' && req.url === '/api/get-access-code') {
+        if (!isAuthenticated(req)) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Não autenticado' }));
+            return;
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            accessCode: currentAccessCode,
+            expiresAt: accessCodeExpiry
+        }));
         return;
     }
 

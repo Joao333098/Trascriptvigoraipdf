@@ -1628,9 +1628,36 @@ document.addEventListener('DOMContentLoaded', function() {
             const data = await response.json();
             if (!data.authenticated) {
                 window.location.href = '/login';
+            } else {
+                checkForAccessCode();
             }
         } catch (error) {
             console.error('Auth check error:', error);
+        }
+    }
+
+    async function checkForAccessCode() {
+        const generatedCode = localStorage.getItem('generatedAccessCode');
+        if (generatedCode) {
+            showAccessCodeModal(generatedCode);
+            localStorage.removeItem('generatedAccessCode');
+        }
+    }
+
+    function showAccessCodeModal(code) {
+        const modal = document.getElementById('accessCodeModal');
+        const display = document.getElementById('accessCodeDisplay');
+        const closeBtn = document.getElementById('closeAccessCodeBtn');
+        
+        if (modal && display) {
+            display.textContent = code;
+            modal.style.display = 'flex';
+            
+            if (closeBtn) {
+                closeBtn.onclick = () => {
+                    modal.style.display = 'none';
+                };
+            }
         }
     }
 
